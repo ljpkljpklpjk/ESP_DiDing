@@ -224,6 +224,8 @@ class TitratorApp(tk.Tk):
 
         self.title("ESP32 自动滴定仪上位机")
         self.geometry("1024x700")
+        self.minsize(900, 620)
+        self.configure(bg="#f3f6fb")
         self.protocol("WM_DELETE_WINDOW", self.on_close)
 
         self.ph_var = tk.StringVar(value="--")
@@ -253,13 +255,36 @@ class TitratorApp(tk.Tk):
         self.esp32_ip_var = tk.StringVar(value="")
         self.ota_password_var = tk.StringVar(value=DEFAULT_OTA_PASSWORD)
 
+        self._configure_style()
         self._build_ui()
         self.after(100, self._poll_serial)
         self.refresh_wifi_status()
 
+    def _configure_style(self):
+        style = ttk.Style(self)
+        try:
+            style.theme_use("clam")
+        except tk.TclError:
+            pass
+        style.configure("TFrame", background="#f3f6fb")
+        style.configure("Card.TFrame", background="#ffffff", relief="flat")
+        style.configure("TLabel", background="#f3f6fb", font=("Arial", 11))
+        style.configure("Card.TLabel", background="#ffffff", font=("Arial", 11))
+        style.configure("Value.TLabel", background="#ffffff", foreground="#1f2937", font=("Arial", 18, "bold"))
+        style.configure("Title.TLabel", background="#f3f6fb", foreground="#0f172a", font=("Arial", 18, "bold"))
+        style.configure("Subtle.TLabel", background="#ffffff", foreground="#64748b", font=("Arial", 10))
+        style.configure("TButton", font=("Arial", 11), padding=(12, 8))
+        style.configure("Primary.TButton", font=("Arial", 11, "bold"), padding=(14, 9))
+        style.configure("Danger.TButton", font=("Arial", 11, "bold"), padding=(14, 9), foreground="#b91c1c")
+        style.configure("TEntry", padding=5)
+        style.configure("TNotebook", background="#f3f6fb", borderwidth=0)
+        style.configure("TNotebook.Tab", font=("Arial", 12, "bold"), padding=(18, 10))
+        style.configure("TLabelframe", background="#f3f6fb", padding=12)
+        style.configure("TLabelframe.Label", background="#f3f6fb", foreground="#0f172a", font=("Arial", 12, "bold"))
+
     def _build_ui(self):
         notebook = ttk.Notebook(self)
-        notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        notebook.pack(fill=tk.BOTH, expand=True, padx=14, pady=14)
 
         control_tab = ttk.Frame(notebook, padding=10)
         network_tab = ttk.Frame(notebook, padding=10)
@@ -273,95 +298,127 @@ class TitratorApp(tk.Tk):
         self._build_update_tab(update_tab)
 
     def _build_control_tab(self, root):
-        telemetry = ttk.LabelFrame(root, text="状态读取", padding=10)
+        ttk.Label(root, text="滴定控制", style="Title.TLabel").pack(anchor="w", pady=(0, 10))
+
+        telemetry = ttk.Frame(root, style="TFrame")
         telemetry.pack(fill=tk.X)
+        for col in range(6):
+            telemetry.columnconfigure(col, weight=1)
+        self._status_card(telemetry, 0, 0, "pH", self.ph_var)
+        self._status_card(telemetry, 0, 1, "温度 ℃", self.temp_var)
+        self._status_card(telemetry, 0, 2, "电压 V", self.voltage_var)
+        self._status_card(telemetry, 0, 3, "PWM1 %", self.pwm_display_var)
+        self._status_card(telemetry, 0, 4, "蠕动泵 %", self.pump_display_var)
+        self._status_card(telemetry, 0, 5, "连接", self.status_var)
 
-        self._label_row(telemetry, 0, "pH", self.ph_var, "温度 ℃", self.temp_var, "电压 V", self.voltage_var)
-        self._label_row(telemetry, 1, "PWM1 %", self.pwm_display_var, "蠕动泵 %", self.pump_display_var, "连接", self.status_var)
-
-        slider = ttk.LabelFrame(root, text="丝杆滑台", padding=10)
-        slider.pack(fill=tk.X, pady=8)
-
-        self._label_row(slider, 0, "当前位置", self.slider_pos_var, "目标位置", self.slider_target_var, "剩余步数", self.slider_distance_var)
-        self._label_row(slider, 1, "已使能", self.slider_enabled_var, "运动中", self.slider_moving_var, "当前速度", self.slider_speed_display_var)
+        slider = ttk.LabelFrame(root, text="丝杆滑台", padding=12)
+        slider.pack(fill=tk.X, pady=12)
+        for col in range(6):
+            slider.columnconfigure(col, weight=1)
+        self._value_cell(slider, 0, 0, "当前位置", self.slider_pos_var)
+        self._value_cell(slider, 0, 1, "目标位置", self.slider_target_var)
+        self._value_cell(slider, 0, 2, "剩余步数", self.slider_distance_var)
+        self._value_cell(slider, 0, 3, "已使能", self.slider_enabled_var)
+        self._value_cell(slider, 0, 4, "运动中", self.slider_moving_var)
+        self._value_cell(slider, 0, 5, "当前速度", self.slider_speed_display_var)
 
         controls = ttk.Frame(slider)
-        controls.grid(row=2, column=0, columnspan=6, sticky="ew", pady=8)
-        ttk.Label(controls, text="速度 steps/s").grid(row=0, column=0, padx=4)
-        ttk.Entry(controls, textvariable=self.slider_speed_set_var, width=10).grid(row=0, column=1, padx=4)
-        ttk.Button(controls, text="设置速度", command=self.set_slider_speed).grid(row=0, column=2, padx=4)
-        ttk.Label(controls, text="加速度").grid(row=0, column=3, padx=4)
-        ttk.Entry(controls, textvariable=self.slider_accel_var, width=10).grid(row=0, column=4, padx=4)
+        controls.grid(row=1, column=0, columnspan=6, sticky="ew", pady=(12, 4))
+        for col in range(10):
+            controls.columnconfigure(col, weight=1)
+        ttk.Label(controls, text="速度 steps/s").grid(row=0, column=0, padx=4, sticky="e")
+        ttk.Entry(controls, textvariable=self.slider_speed_set_var, width=10).grid(row=0, column=1, padx=4, sticky="ew")
+        ttk.Button(controls, text="设置速度", style="Primary.TButton", command=self.set_slider_speed).grid(row=0, column=2, padx=4)
+        ttk.Label(controls, text="加速度").grid(row=0, column=3, padx=4, sticky="e")
+        ttk.Entry(controls, textvariable=self.slider_accel_var, width=10).grid(row=0, column=4, padx=4, sticky="ew")
         ttk.Button(controls, text="设置加速度", command=self.set_slider_accel).grid(row=0, column=5, padx=4)
-
-        move = ttk.Frame(slider)
-        move.grid(row=3, column=0, columnspan=6, sticky="ew", pady=8)
-        ttk.Label(move, text="距离 mm").grid(row=0, column=0, padx=4)
-        ttk.Entry(move, textvariable=self.move_mm_var, width=10).grid(row=0, column=1, padx=4)
-        ttk.Button(move, text="移动距离", command=self.move_slider_mm).grid(row=0, column=2, padx=4)
-        ttk.Label(move, text="时间 s").grid(row=0, column=3, padx=4)
-        ttk.Entry(move, textvariable=self.move_sec_var, width=10).grid(row=0, column=4, padx=4)
-        ttk.Button(move, text="按时间移动", command=self.move_slider_time).grid(row=0, column=5, padx=4)
+        ttk.Label(controls, text="距离 mm").grid(row=1, column=0, padx=4, pady=8, sticky="e")
+        ttk.Entry(controls, textvariable=self.move_mm_var, width=10).grid(row=1, column=1, padx=4, pady=8, sticky="ew")
+        ttk.Button(controls, text="移动距离", style="Primary.TButton", command=self.move_slider_mm).grid(row=1, column=2, padx=4, pady=8)
+        ttk.Label(controls, text="时间 s").grid(row=1, column=3, padx=4, pady=8, sticky="e")
+        ttk.Entry(controls, textvariable=self.move_sec_var, width=10).grid(row=1, column=4, padx=4, pady=8, sticky="ew")
+        ttk.Button(controls, text="按时间移动", command=self.move_slider_time).grid(row=1, column=5, padx=4, pady=8)
 
         actions = ttk.Frame(slider)
-        actions.grid(row=4, column=0, columnspan=6, sticky="ew", pady=8)
-        for idx, (text, cmd) in enumerate([
-            ("使能", self.slider_enable),
-            ("关闭使能", self.slider_disable),
-            ("停止", self.slider_stop),
-            ("立即停止", self.slider_halt),
-            ("清零", self.slider_zero),
-            ("急停", self.emergency_stop),
+        actions.grid(row=2, column=0, columnspan=6, sticky="ew", pady=8)
+        for idx, (text, cmd, style_name) in enumerate([
+            ("使能", self.slider_enable, "Primary.TButton"),
+            ("关闭使能", self.slider_disable, "TButton"),
+            ("停止", self.slider_stop, "TButton"),
+            ("立即停止", self.slider_halt, "TButton"),
+            ("清零", self.slider_zero, "TButton"),
+            ("急停", self.emergency_stop, "Danger.TButton"),
         ]):
-            ttk.Button(actions, text=text, command=cmd).grid(row=0, column=idx, padx=4)
+            actions.columnconfigure(idx, weight=1)
+            ttk.Button(actions, text=text, style=style_name, command=cmd).grid(row=0, column=idx, padx=5, sticky="ew")
 
-        pump_frame = ttk.LabelFrame(root, text="PWM / 蠕动泵", padding=10)
-        pump_frame.pack(fill=tk.X, pady=8)
-        ttk.Label(pump_frame, text="PWM1 %").grid(row=0, column=0, padx=4)
-        ttk.Entry(pump_frame, textvariable=self.pwm_set_var, width=10).grid(row=0, column=1, padx=4)
-        ttk.Button(pump_frame, text="设置 PWM1", command=self.set_pwm1).grid(row=0, column=2, padx=4)
-        ttk.Label(pump_frame, text="蠕动泵 %").grid(row=0, column=3, padx=4)
-        ttk.Entry(pump_frame, textvariable=self.pump_set_var, width=10).grid(row=0, column=4, padx=4)
-        ttk.Button(pump_frame, text="设置蠕动泵", command=self.set_pump).grid(row=0, column=5, padx=4)
+        pump_frame = ttk.LabelFrame(root, text="PWM / 蠕动泵", padding=12)
+        pump_frame.pack(fill=tk.X, pady=(0, 12))
+        for col in range(7):
+            pump_frame.columnconfigure(col, weight=1)
+        ttk.Label(pump_frame, text="PWM1 %").grid(row=0, column=0, padx=4, sticky="e")
+        ttk.Entry(pump_frame, textvariable=self.pwm_set_var, width=10).grid(row=0, column=1, padx=4, sticky="ew")
+        ttk.Button(pump_frame, text="设置 PWM1", style="Primary.TButton", command=self.set_pwm1).grid(row=0, column=2, padx=4)
+        ttk.Label(pump_frame, text="蠕动泵 %").grid(row=0, column=3, padx=4, sticky="e")
+        ttk.Entry(pump_frame, textvariable=self.pump_set_var, width=10).grid(row=0, column=4, padx=4, sticky="ew")
+        ttk.Button(pump_frame, text="设置蠕动泵", style="Primary.TButton", command=self.set_pump).grid(row=0, column=5, padx=4)
         ttk.Button(pump_frame, text="停止蠕动泵", command=self.pump_stop).grid(row=0, column=6, padx=4)
 
         log_frame = ttk.LabelFrame(root, text="通信日志", padding=10)
         log_frame.pack(fill=tk.BOTH, expand=True)
-        self.log = tk.Text(log_frame, height=12)
+        self.log = tk.Text(log_frame, height=8, bg="#0f172a", fg="#e5e7eb", insertbackground="#e5e7eb", relief=tk.FLAT)
         self.log.pack(fill=tk.BOTH, expand=True)
 
     def _build_network_tab(self, root):
-        frame = ttk.LabelFrame(root, text="树莓派 WiFi", padding=10)
+        ttk.Label(root, text="网络设置", style="Title.TLabel").pack(anchor="w", pady=(0, 10))
+        frame = ttk.LabelFrame(root, text="树莓派 WiFi", padding=14)
         frame.pack(fill=tk.X)
-        ttk.Label(frame, text="状态").grid(row=0, column=0, sticky="w", padx=4, pady=4)
-        ttk.Label(frame, textvariable=self.pi_wifi_status_var).grid(row=0, column=1, columnspan=4, sticky="w", padx=4, pady=4)
-        ttk.Button(frame, text="刷新状态", command=self.refresh_wifi_status).grid(row=1, column=0, padx=4, pady=6)
-        ttk.Button(frame, text="打开 WiFi", command=self.wifi_on).grid(row=1, column=1, padx=4, pady=6)
-        ttk.Button(frame, text="关闭 WiFi", command=self.wifi_off).grid(row=1, column=2, padx=4, pady=6)
-        ttk.Label(frame, text="WiFi 名称").grid(row=2, column=0, sticky="w", padx=4, pady=4)
-        ttk.Entry(frame, textvariable=self.wifi_ssid_var, width=28).grid(row=2, column=1, padx=4, pady=4)
-        ttk.Label(frame, text="密码").grid(row=2, column=2, sticky="w", padx=4, pady=4)
-        ttk.Entry(frame, textvariable=self.wifi_password_var, width=28, show="*").grid(row=2, column=3, padx=4, pady=4)
-        ttk.Button(frame, text="连接 WiFi", command=self.connect_wifi).grid(row=2, column=4, padx=4, pady=4)
+        frame.columnconfigure(1, weight=1)
+        frame.columnconfigure(3, weight=1)
+        ttk.Label(frame, text="状态").grid(row=0, column=0, sticky="w", padx=4, pady=6)
+        ttk.Label(frame, textvariable=self.pi_wifi_status_var, wraplength=760).grid(row=0, column=1, columnspan=4, sticky="ew", padx=4, pady=6)
+        ttk.Button(frame, text="刷新状态", style="Primary.TButton", command=self.refresh_wifi_status).grid(row=1, column=0, padx=4, pady=8, sticky="ew")
+        ttk.Button(frame, text="打开 WiFi", command=self.wifi_on).grid(row=1, column=1, padx=4, pady=8, sticky="ew")
+        ttk.Button(frame, text="关闭 WiFi", command=self.wifi_off).grid(row=1, column=2, padx=4, pady=8, sticky="ew")
+        ttk.Label(frame, text="WiFi 名称").grid(row=2, column=0, sticky="w", padx=4, pady=8)
+        ttk.Entry(frame, textvariable=self.wifi_ssid_var, width=28).grid(row=2, column=1, sticky="ew", padx=4, pady=8)
+        ttk.Label(frame, text="密码").grid(row=2, column=2, sticky="w", padx=4, pady=8)
+        ttk.Entry(frame, textvariable=self.wifi_password_var, width=28, show="*").grid(row=2, column=3, sticky="ew", padx=4, pady=8)
+        ttk.Button(frame, text="连接 WiFi", style="Primary.TButton", command=self.connect_wifi).grid(row=2, column=4, padx=4, pady=8, sticky="ew")
 
     def _build_update_tab(self, root):
-        frame = ttk.LabelFrame(root, text="系统更新", padding=10)
+        ttk.Label(root, text="系统更新", style="Title.TLabel").pack(anchor="w", pady=(0, 10))
+        frame = ttk.LabelFrame(root, text="Gitee / OTA", padding=14)
         frame.pack(fill=tk.X)
-        ttk.Label(frame, text="项目路径").grid(row=0, column=0, sticky="w", padx=4, pady=4)
-        ttk.Entry(frame, textvariable=self.project_dir_var, width=70).grid(row=0, column=1, columnspan=3, sticky="ew", padx=4, pady=4)
-        ttk.Label(frame, text="ESP32 IP").grid(row=1, column=0, sticky="w", padx=4, pady=4)
-        ttk.Entry(frame, textvariable=self.esp32_ip_var, width=24).grid(row=1, column=1, sticky="w", padx=4, pady=4)
-        ttk.Label(frame, text="OTA 密码").grid(row=1, column=2, sticky="w", padx=4, pady=4)
-        ttk.Entry(frame, textvariable=self.ota_password_var, width=24, show="*").grid(row=1, column=3, sticky="w", padx=4, pady=4)
-        ttk.Button(frame, text="检查 Gitee 更新", command=self.check_project_update).grid(row=2, column=0, padx=4, pady=8)
-        ttk.Button(frame, text="从 Gitee 更新代码", command=self.update_project).grid(row=2, column=1, padx=4, pady=8)
-        ttk.Button(frame, text="更新 ESP32 固件 OTA", command=self.update_esp32_ota).grid(row=2, column=2, padx=4, pady=8)
-        ttk.Label(frame, text="OTA 进度").grid(row=3, column=0, sticky="w", padx=4, pady=4)
-        ttk.Label(frame, textvariable=self.ota_progress_var, wraplength=800).grid(row=3, column=1, columnspan=3, sticky="w", padx=4, pady=4)
+        frame.columnconfigure(1, weight=1)
+        frame.columnconfigure(3, weight=1)
+        ttk.Label(frame, text="项目路径").grid(row=0, column=0, sticky="w", padx=4, pady=8)
+        ttk.Entry(frame, textvariable=self.project_dir_var, width=70).grid(row=0, column=1, columnspan=3, sticky="ew", padx=4, pady=8)
+        ttk.Label(frame, text="ESP32 IP").grid(row=1, column=0, sticky="w", padx=4, pady=8)
+        ttk.Entry(frame, textvariable=self.esp32_ip_var, width=24).grid(row=1, column=1, sticky="ew", padx=4, pady=8)
+        ttk.Label(frame, text="OTA 密码").grid(row=1, column=2, sticky="w", padx=4, pady=8)
+        ttk.Entry(frame, textvariable=self.ota_password_var, width=24, show="*").grid(row=1, column=3, sticky="ew", padx=4, pady=8)
+        ttk.Button(frame, text="检查 Gitee 更新", command=self.check_project_update).grid(row=2, column=0, padx=4, pady=10, sticky="ew")
+        ttk.Button(frame, text="从 Gitee 更新代码", style="Primary.TButton", command=self.update_project).grid(row=2, column=1, padx=4, pady=10, sticky="ew")
+        ttk.Button(frame, text="更新 ESP32 固件 OTA", style="Primary.TButton", command=self.update_esp32_ota).grid(row=2, column=2, padx=4, pady=10, sticky="ew")
+        ttk.Label(frame, text="OTA 进度").grid(row=3, column=0, sticky="w", padx=4, pady=8)
+        ttk.Label(frame, textvariable=self.ota_progress_var, wraplength=800).grid(row=3, column=1, columnspan=3, sticky="ew", padx=4, pady=8)
         self.ota_progress_bar = ttk.Progressbar(frame, mode="indeterminate")
-        self.ota_progress_bar.grid(row=4, column=1, columnspan=3, sticky="ew", padx=4, pady=4)
-        ttk.Label(frame, text="状态").grid(row=5, column=0, sticky="w", padx=4, pady=4)
-        ttk.Label(frame, textvariable=self.update_status_var, wraplength=800).grid(row=5, column=1, columnspan=3, sticky="w", padx=4, pady=4)
+        self.ota_progress_bar.grid(row=4, column=1, columnspan=3, sticky="ew", padx=4, pady=8)
+        ttk.Label(frame, text="状态").grid(row=5, column=0, sticky="w", padx=4, pady=8)
+        ttk.Label(frame, textvariable=self.update_status_var, wraplength=800).grid(row=5, column=1, columnspan=3, sticky="ew", padx=4, pady=8)
+
+    def _status_card(self, parent, row, col, title, var):
+        card = ttk.Frame(parent, style="Card.TFrame", padding=12)
+        card.grid(row=row, column=col, sticky="nsew", padx=5, pady=5)
+        ttk.Label(card, text=title, style="Subtle.TLabel").pack(anchor="w")
+        ttk.Label(card, textvariable=var, style="Value.TLabel", wraplength=140).pack(anchor="w", pady=(5, 0))
+
+    def _value_cell(self, parent, row, col, title, var):
+        cell = ttk.Frame(parent, padding=8)
+        cell.grid(row=row, column=col, sticky="nsew", padx=4, pady=4)
+        ttk.Label(cell, text=title).pack(anchor="w")
+        ttk.Label(cell, textvariable=var, font=("Arial", 13, "bold")).pack(anchor="w", pady=(3, 0))
 
     def _label_row(self, parent, row, label1, var1, label2, var2, label3, var3):
         labels = [(label1, var1), (label2, var2), (label3, var3)]

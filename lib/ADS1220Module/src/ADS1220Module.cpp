@@ -96,7 +96,7 @@ bool ADS1220Module::waitDrdyLow(uint32_t timeoutMs) const {
   uint32_t start = millis();
   while (digitalRead(pins_.drdy) == HIGH) {
     if (millis() - start > timeoutMs) return false;
-    delay(1);
+    yield();
   }
   return true;
 }

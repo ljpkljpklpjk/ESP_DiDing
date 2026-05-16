@@ -41,6 +41,8 @@ static constexpr bool SERIAL_DEBUG_TEXT = false;
 static constexpr uint32_t TELEMETRY_INTERVAL_MS = 1000;
 static constexpr uint32_t WIFI_RETRY_INTERVAL_MS = 10000;
 static constexpr size_t SERIAL_RX_BUF_SIZE = 320;
+static constexpr size_t SERIAL_BYTES_PER_LOOP = 48;
+static constexpr uint32_t OTA_HANDLE_INTERVAL_MS = 10;
 static constexpr uint8_t DS18B20_PIN = 2;
 
 static const char *WIFI_SSID = "Lab807_2.4G";
@@ -90,6 +92,7 @@ static uint32_t gLastTempSampleMs = 0;
 static float gLastTempC = NAN;
 static uint32_t gLastTelemetryMs = 0;
 static uint32_t gLastWifiRetryMs = 0;
+static uint32_t gLastOtaHandleMs = 0;
 static bool gOtaReady = false;
 static char gSerialRxBuf[SERIAL_RX_BUF_SIZE];
 static size_t gSerialRxLen = 0;
@@ -197,10 +200,16 @@ static void runSlider() {
   }
 }
 
+static bool sliderBusy() {
+  return gSliderMoveActive || gSliderStopActive || sliderStepper.distanceToGo() != 0;
+}
+
 static void updateSerialTelemetry() {
+  if (sliderBusy()) {
+    return;
+  }
   const uint32_t now = millis();
-  const uint32_t interval = gSliderMoveActive || gSliderStopActive ? 2500 : TELEMETRY_INTERVAL_MS;
-  if (now - gLastTelemetryMs < interval) {
+  if (now - gLastTelemetryMs < TELEMETRY_INTERVAL_MS) {
     return;
   }
   gLastTelemetryMs = now;
@@ -305,6 +314,15 @@ static void setupOta() {
   ArduinoOTA.begin();
   gOtaReady = true;
   sendOtaStatus("ready");
+}
+
+static void updateOta() {
+  const uint32_t now = millis();
+  if (now - gLastOtaHandleMs < OTA_HANDLE_INTERVAL_MS) {
+    return;
+  }
+  gLastOtaHandleMs = now;
+  ArduinoOTA.handle();
 }
 
 static void updateWifi() {
@@ -487,7 +505,9 @@ static void handleSerialJsonLine(const char *line) {
 }
 
 static void processSerialInput() {
-  while (Serial.available() > 0) {
+  size_t processed = 0;
+  while (Serial.available() > 0 && processed < SERIAL_BYTES_PER_LOOP) {
+    ++processed;
     const char c = static_cast<char>(Serial.read());
     if (c == '\r') {
       continue;
@@ -621,18 +641,18 @@ void loop() {
   runSlider();
   processSerialInput();
   runSlider();
-  ArduinoOTA.handle();
+  updateOta();
   runSlider();
   updateWifi();
   runSlider();
   updateSliderCompletion();
   runSlider();
 
-  if (!gSliderMoveActive && !gSliderStopActive) {
+  if (!sliderBusy()) {
     updatePhReading();
     runSlider();
     updateTemperatureReading();
     runSlider();
+    updateSerialTelemetry();
   }
-  updateSerialTelemetry();
 }

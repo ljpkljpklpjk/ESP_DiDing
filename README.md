@@ -1,75 +1,195 @@
 # ESP32-S3滴定仪测试固件
 
-本仓库为基于ESP32-S3主控的滴定仪测试固件，用于测试PH计测量、温度测量、触摸屏的显示与触摸功能和两路PWM信号输出功能
+本仓库为基于 ESP32-S3 主控的自动滴定仪下位机测试固件。当前通信方式为串口 JSON Lines：树莓派上位机按行下发 JSON 控制指令，ESP32 按行回传遥测、确认和错误信息。
 
-## 原件选型
+## 已支持功能
 
-**主控**：ESP32-S3开发板
+- ADS1220 + pH 电极电压采集与 pH 换算
+- DS18B20 温度采集
+- PWM1 输出控制
+- DFR0523 蠕动泵控制
+- TMC2209 STEP/DIR 丝杆滑台控制
+- 串口 JSON 通信
 
-**LCD触控屏**：3.5英寸IPS触摸屏，分辨率320*480，支持SPI协议
+## 硬件选型
 
-**PH计模块**：PH计配合ADS1220 ADC模块
+**主控**：ESP32-S3 开发板
 
-**温度测量模块**：DS18B20模块
+**PH计模块**：PH 计配合 ADS1220 ADC 模块
+
+**温度测量模块**：DS18B20 模块
+
+**蠕动泵**：DFR0523 或兼容 PWM/PPM 信号控制蠕动泵
+
+**丝杆滑台**：28 步进电机，1.8°/步，丝杆直径 6mm，螺距 2mm
+
+**步进驱动**：TMC2209，STEP/DIR 模式，16 细分
 
 ## 接线
 
 ### ESP32-S3
 
-5Vin接5V
+5Vin 接 5V，所有外设 GND 必须与 ESP32 GND 共地。
 
-### ADS1220模块与PH模块
+### ADS1220 模块与 PH 模块
 
-CS接开发板21号引脚
+```text
+CS    -> GPIO21
+DRDY  -> GPIO15
+SCLK  -> GPIO4
+MISO  -> GPIO13
+MOSI  -> GPIO14
+DVDD  -> 3.3V
+DGND  -> GND
+AGND  -> AIN1
+PH P0 -> AIN0
+PH VCC -> 3.3V
+PH GND -> GND
+```
 
-DRDY接开发板15号引脚
+### DS18B20 模块
 
-SCDLK接开发板4号引脚
+```text
+DAT -> GPIO2
+VCC -> 3.3V
+GND -> GND
+```
 
-MISO接开发板13号引脚
+### PWM / 蠕动泵
 
-MOSI接开发板14号引脚
+```text
+PWM1 输出       -> GPIO5
+蠕动泵信号输入 -> GPIO6
+```
 
-DVDD接3.3V，DGND接地
+### TMC2209 丝杆滑台
 
-AGND接AIN1
+```text
+ESP32 GPIO10 -> TMC2209 STEP
+ESP32 GPIO11 -> TMC2209 DIR
+ESP32 GPIO12 -> TMC2209 EN
+ESP32 3.3V   -> TMC2209 VIO / VCC
+ESP32 GND    -> TMC2209 GND
+外部电源 +    -> TMC2209 VM / VMOT
+外部电源 -    -> TMC2209 GND
 
-AIN0接PH计P0
+TMC2209 1A / 1B -> 电机其中一组线圈
+TMC2209 2A / 2B -> 电机另一组线圈
+```
 
-PH计GND接地，VCC接3.3V
+> 注意：ESP32 不能直接驱动步进电机线圈，必须经过 TMC2209。通电时不要插拔电机线。
 
-### LCD触摸屏
+## 丝杆滑台参数
 
-VCC接3.3V，GND接地
+```text
+电机：1.8°/步 = 200 整步/圈
+TMC2209：16 细分
+丝杆：2mm/圈
+换算：1mm = 200 * 16 / 2 = 1600 脉冲
+推荐稳定速度：1000 steps/s
+推荐稳定加速度：500 steps/s²
+```
 
-LCD-CS接开发板10号引脚
+## 串口 JSON 协议
 
-LCD-RES接开发板8号引脚
+- 波特率：115200
+- 一行一个 JSON
+- 每条 JSON 以换行符 `\n` 结束
 
-LCD-DC接开发板9号引脚
+### ESP32 自动上报
 
-LCD-SDI接开发板11号引脚
+ESP32 每 1 秒上报一次：
 
-SCK接开发板12号引脚
+```json
+{"type":"telemetry","ph":7.123,"temperature_c":25.6,"pwm1_percent":0,"pump_percent":0,"slider":{"pos":0,"target":0,"distance":0,"moving":false,"enabled":false,"speed":1000,"steps_per_mm":1600}}
+```
 
-BLC接开发板7号引脚
+### 设置 PWM 和蠕动泵
 
-T-SCL接开发板18号引脚
+兼容旧字段：
 
-T-RST接开发板16号引脚
+```json
+{"pwm1_percent":20,"pump_percent":30}
+```
 
-T-SDA接开发板17号引脚
+推荐新格式：
 
-T-INT接开发板19号引脚
+```json
+{"cmd":"set_pwm1","id":1,"percent":20}
+{"cmd":"set_pump","id":2,"percent":30}
+{"cmd":"pump_stop","id":3}
+```
 
-### DS18B20模块
+### 丝杆滑台控制
 
-VCC接3.3V，GND接地
+```json
+{"cmd":"slider_enable","id":10}
+{"cmd":"slider_disable","id":11}
+{"cmd":"slider_speed","id":12,"speed":1000}
+{"cmd":"slider_accel","id":13,"accel":500}
+{"cmd":"slider_move_mm","id":14,"mm":10}
+{"cmd":"slider_move_time","id":15,"mm":10,"sec":20}
+{"cmd":"slider_stop","id":16}
+{"cmd":"slider_halt","id":17}
+{"cmd":"slider_zero","id":18}
+```
 
-DAT接开发板2号引脚
+### 急停
 
-### PWM输出
+```json
+{"cmd":"emergency_stop","id":99}
+```
 
-PWM1输出为开发板5号引脚
+急停会立即停止滑台、关闭滑台驱动、停止 PWM1 和蠕动泵。
 
-PWM2输出为开发板6号引脚
+### 回传格式
+
+确认：
+
+```json
+{"type":"ack","id":14,"ok":true}
+```
+
+滑台运动完成：
+
+```json
+{"type":"done","id":14,"ok":true}
+```
+
+错误：
+
+```json
+{"type":"error","id":14,"code":"missing_mm"}
+```
+
+## 树莓派上位机
+
+树莓派 Tkinter 上位机文件放在：
+
+```text
+raspberry_pi/titrator_gui.py
+```
+
+安装依赖：
+
+```bash
+pip3 install pyserial
+```
+
+运行示例：
+
+```bash
+python3 raspberry_pi/titrator_gui.py --port /dev/ttyUSB0
+```
+
+如果 ESP32 通过 USB 连接，也可能是：
+
+```bash
+python3 raspberry_pi/titrator_gui.py --port /dev/ttyACM0
+```
+
+## 编译
+
+```bash
+C:/Users/MI/.platformio/penv/Scripts/platformio.exe run -d D:/galgame/ESP_DiDing_codex_new_feature
+```

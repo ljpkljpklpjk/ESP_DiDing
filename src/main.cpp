@@ -1,7 +1,9 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <AccelStepper.h>
+#include <ArduinoOTA.h>
 #include <SPI.h>
+#include <WiFi.h>
 
 #include "ADS1220Module.h"
 #include "DS18B20Module.h"
@@ -37,8 +39,14 @@ static constexpr uint32_t PUMP_PPM_FREQ_HZ = 500;
 static constexpr uint8_t PUMP_PWM_RES_BITS = 10;
 static constexpr bool SERIAL_DEBUG_TEXT = false;
 static constexpr uint32_t TELEMETRY_INTERVAL_MS = 1000;
+static constexpr uint32_t WIFI_RETRY_INTERVAL_MS = 10000;
 static constexpr size_t SERIAL_RX_BUF_SIZE = 320;
 static constexpr uint8_t DS18B20_PIN = 2;
+
+static const char *WIFI_SSID = "Lab807_2.4G";
+static const char *WIFI_PASSWORD = "lab80700";
+static const char *OTA_HOSTNAME = "esp-diding";
+static const char *OTA_PASSWORD = "lab80700";
 
 // ---------------- Lead screw slider ----------------
 static constexpr uint8_t SLIDER_STEP_PIN = 10;
@@ -81,6 +89,8 @@ static float gLastPh = NAN;
 static uint32_t gLastTempSampleMs = 0;
 static float gLastTempC = NAN;
 static uint32_t gLastTelemetryMs = 0;
+static uint32_t gLastWifiRetryMs = 0;
+static bool gOtaReady = false;
 static char gSerialRxBuf[SERIAL_RX_BUF_SIZE];
 static size_t gSerialRxLen = 0;
 
@@ -174,6 +184,9 @@ static void sendTelemetryJson() {
   sendJsonFloatOrNull(doc, "temperature_c", gLastTempC);
   doc["pwm1_percent"] = gPwm1Percent;
   doc["pump_percent"] = gPumpPercent;
+  doc["wifi_connected"] = WiFi.status() == WL_CONNECTED;
+  doc["ip"] = WiFi.status() == WL_CONNECTED ? WiFi.localIP().toString() : "";
+  doc["ota_ready"] = gOtaReady;
   addSliderTelemetry(doc);
   sendJson(doc);
 }
@@ -251,6 +264,54 @@ static void emergencyStop() {
   setSliderEnabled(false);
   setPwm1Percent(0.0f);
   setPumpPercent(0.0f);
+}
+
+static void sendOtaStatus(const char *event) {
+  JsonDocument doc;
+  doc["type"] = "ota";
+  doc["event"] = event;
+  doc["ip"] = WiFi.status() == WL_CONNECTED ? WiFi.localIP().toString() : "";
+  sendJson(doc);
+}
+
+static void setupOta() {
+  WiFi.mode(WIFI_STA);
+  WiFi.setAutoReconnect(true);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+
+  ArduinoOTA.setHostname(OTA_HOSTNAME);
+  ArduinoOTA.setPassword(OTA_PASSWORD);
+  ArduinoOTA.onStart([]() {
+    emergencyStop();
+    sendOtaStatus("start");
+  });
+  ArduinoOTA.onEnd([]() {
+    sendOtaStatus("end");
+  });
+  ArduinoOTA.onError([](ota_error_t error) {
+    JsonDocument doc;
+    doc["type"] = "ota";
+    doc["event"] = "error";
+    doc["code"] = static_cast<int>(error);
+    sendJson(doc);
+  });
+  ArduinoOTA.begin();
+  gOtaReady = true;
+  sendOtaStatus("ready");
+}
+
+static void updateWifi() {
+  if (WiFi.status() == WL_CONNECTED) {
+    return;
+  }
+
+  const uint32_t now = millis();
+  if (now - gLastWifiRetryMs < WIFI_RETRY_INTERVAL_MS) {
+    return;
+  }
+  gLastWifiRetryMs = now;
+  WiFi.disconnect();
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 }
 
 static void handleCommandObject(JsonDocument &doc) {
@@ -532,6 +593,8 @@ void setup() {
   ads.setPHCalibration(kPhCal);
   const bool dsReady = ds18b20.begin();
 
+  setupOta();
+
   if (SERIAL_DEBUG_TEXT) {
     Serial.printf("ADS1220 cfg: R0=0x%02X R1=0x%02X R2=0x%02X R3=0x%02X\n",
                   ads.readRegister(0), ads.readRegister(1), ads.readRegister(2), ads.readRegister(3));
@@ -549,6 +612,8 @@ void setup() {
 
 void loop() {
   processSerialInput();
+  ArduinoOTA.handle();
+  updateWifi();
 
   if (gSliderEnabled) {
     sliderStepper.run();

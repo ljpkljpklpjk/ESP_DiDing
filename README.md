@@ -188,6 +188,48 @@ python3 raspberry_pi/titrator_gui.py --port /dev/ttyUSB0
 python3 raspberry_pi/titrator_gui.py --port /dev/ttyACM0
 ```
 
+## OTA 远程上传
+
+当前测试阶段固件会连接 WiFi `Lab807_2.4G`，OTA 主机名为 `esp-diding`，OTA 密码为测试密码。每次 OTA 开始前，下位机会自动执行急停：停止滑台、关闭滑台驱动、停止 PWM1 和蠕动泵。
+
+第一次仍需要 USB 烧录带 OTA 功能的固件；之后 ESP32 和电脑在同一 WiFi 下即可远程上传。
+
+串口遥测会包含：
+
+```json
+{"wifi_connected":true,"ip":"192.168.x.x","ota_ready":true}
+```
+
+远程上传示例，优先使用串口遥测里显示的 IP：
+
+```bash
+C:/Users/MI/.platformio/penv/Scripts/platformio.exe run -d D:/galgame/ESP_DiDing_codex_new_feature -t upload --upload-protocol espota --upload-port 192.168.x.x --upload-flags "--auth=lab80700"
+```
+
+如果电脑能解析 mDNS，也可以尝试：
+
+```bash
+C:/Users/MI/.platformio/penv/Scripts/platformio.exe run -d D:/galgame/ESP_DiDing_codex_new_feature -t upload --upload-protocol espota --upload-port esp-diding.local --upload-flags "--auth=lab80700"
+```
+
+### 树莓派中转 OTA
+
+更推荐的远程方式是让树莓派作为中转：用户在树莓派连接的屏幕界面上点击更新，树莓派在实验室局域网内给 ESP32 OTA 上传。这样 ESP32 不需要暴露到公网。
+
+在树莓派安装依赖：
+
+```bash
+pip3 install platformio
+```
+
+同步项目代码到树莓派后执行：
+
+```bash
+python3 raspberry_pi/ota_update.py --host 192.168.x.x
+```
+
+其中 `192.168.x.x` 换成 ESP32 遥测中显示的 IP。
+
 ## 编译
 
 ```bash

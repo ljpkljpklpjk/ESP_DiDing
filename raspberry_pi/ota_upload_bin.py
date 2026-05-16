@@ -98,6 +98,7 @@ def upload_firmware(host: str, esp_port: int, local_host: str, local_port: int, 
             conn.settimeout(timeout)
             sent = 0
             last_percent = -1
+            last_response = ""
             try:
                 with firmware_path.open("rb") as firmware:
                     while True:
@@ -105,10 +106,7 @@ def upload_firmware(host: str, esp_port: int, local_host: str, local_port: int, 
                         if not chunk:
                             break
                         conn.sendall(chunk)
-                        response = conn.recv(16).decode(errors="replace")
-                        if "OK" not in response:
-                            print(f"ESP32 上传响应异常: {response}", file=sys.stderr, flush=True)
-                            return 1
+                        last_response = conn.recv(16).decode(errors="replace").strip()
                         sent += len(chunk)
                         percent = int(sent * 100 / size)
                         if percent != last_percent and (percent % 5 == 0 or percent == 100):
@@ -119,11 +117,14 @@ def upload_firmware(host: str, esp_port: int, local_host: str, local_port: int, 
                 return 1
 
             print("OTA 上传完成，等待 ESP32 写入结果...", flush=True)
+            if "OK" in last_response:
+                print("OTA 完成，ESP32 将重启", flush=True)
+                return 0
             try:
                 result = conn.recv(64).decode(errors="replace")
             except socket.timeout:
                 result = ""
-            if not result or "OK" in result:
+            if "OK" in result:
                 print("OTA 完成，ESP32 将重启", flush=True)
                 return 0
             print(f"OTA 结果异常: {result}", file=sys.stderr, flush=True)

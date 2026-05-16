@@ -6,6 +6,7 @@
 #include "ADS1220Module.h"
 #include "DS18B20Module.h"
 #include "MotorPWMControl.h"
+#include "PeristalticPumpControl.h"
 
 // ---------------- LCD(ST7796S) ----------------
 static constexpr int PIN_LCD_SCK = 12;
@@ -44,13 +45,15 @@ static PHCalibrationTwoPoint kPhCal = {
     .tempC = ENV_TEMP_C,
 };
 
-// ---------------- Dual PWM ----------------
+// ---------------- PWM + DFR0523 Pump ----------------
 static constexpr uint8_t PWM1_PIN = 5;
-static constexpr uint8_t PWM2_PIN = 6;
 static constexpr uint8_t PWM1_CHANNEL = 0;
-static constexpr uint8_t PWM2_CHANNEL = 1;
 static constexpr uint32_t PWM_FREQ_HZ = 20000;
 static constexpr uint8_t PWM_RES_BITS = 10;
+static constexpr uint8_t PUMP_SIGNAL_PIN = 6;
+static constexpr uint8_t PUMP_PWM_CHANNEL = 1;
+static constexpr uint32_t PUMP_PPM_FREQ_HZ = 500;
+static constexpr uint8_t PUMP_PWM_RES_BITS = 10;
 static constexpr float PWM_STEP_PERCENT = 5.0f;
 static constexpr uint8_t DS18B20_PIN = 2;
 
@@ -59,7 +62,8 @@ static SPIClass adsSpi(FSPI);
 static ADS1220Module ads(adsSpi, kAdsPins);
 static DS18B20Module ds18b20(DS18B20_PIN);
 static MotorPWMControl pwm1(PWM1_PIN, PWM1_CHANNEL, PWM_FREQ_HZ, PWM_RES_BITS);
-static MotorPWMControl pwm2(PWM2_PIN, PWM2_CHANNEL, PWM_FREQ_HZ, PWM_RES_BITS);
+static PeristalticPumpControl pump(PUMP_SIGNAL_PIN, PUMP_PWM_CHANNEL,
+                                   PUMP_PPM_FREQ_HZ, PUMP_PWM_RES_BITS);
 
 static lv_disp_draw_buf_t drawBuf;
 static lv_disp_drv_t dispDrv;
@@ -71,10 +75,10 @@ static lv_obj_t *phLabel = nullptr;
 static lv_obj_t *voltageLabel = nullptr;
 static lv_obj_t *tempLabel = nullptr;
 static lv_obj_t *pwm1Label = nullptr;
-static lv_obj_t *pwm2Label = nullptr;
+static lv_obj_t *pumpLabel = nullptr;
 
 static float gPwm1Percent = 0.0f;
-static float gPwm2Percent = 0.0f;
+static float gPumpPercent = 0.0f;
 
 static uint32_t gLastSampleMs = 0;
 static float gLastVoltage = NAN;
@@ -314,15 +318,15 @@ static void formatFixed(char *out, size_t outSize, float value, int decimals) {
 
 static void refreshPwmLabels() {
   char pwm1Text[32];
-  char pwm2Text[32];
+  char pumpText[32];
   char v1[16];
-  char v2[16];
+  char pumpValue[16];
   formatFixed(v1, sizeof(v1), gPwm1Percent, 1);
-  formatFixed(v2, sizeof(v2), gPwm2Percent, 1);
+  formatFixed(pumpValue, sizeof(pumpValue), gPumpPercent, 1);
   snprintf(pwm1Text, sizeof(pwm1Text), "PWM1 Duty: %s%%", v1);
-  snprintf(pwm2Text, sizeof(pwm2Text), "PWM2 Duty: %s%%", v2);
+  snprintf(pumpText, sizeof(pumpText), "Pump Speed: %s%%", pumpValue);
   lv_label_set_text(pwm1Label, pwm1Text);
-  lv_label_set_text(pwm2Label, pwm2Text);
+  lv_label_set_text(pumpLabel, pumpText);
 }
 
 static void applyPwm1(float delta) {
@@ -331,9 +335,9 @@ static void applyPwm1(float delta) {
   refreshPwmLabels();
 }
 
-static void applyPwm2(float delta) {
-  gPwm2Percent = clampPercent(gPwm2Percent + delta);
-  pwm2.setSpeedPercent(gPwm2Percent);
+static void applyPump(float delta) {
+  gPumpPercent = clampPercent(gPumpPercent + delta);
+  pump.setSpeedPercent(gPumpPercent);
   refreshPwmLabels();
 }
 
@@ -347,14 +351,14 @@ static void onPwm1Plus(lv_event_t *e) {
   applyPwm1(PWM_STEP_PERCENT);
 }
 
-static void onPwm2Minus(lv_event_t *e) {
+static void onPumpMinus(lv_event_t *e) {
   (void)e;
-  applyPwm2(-PWM_STEP_PERCENT);
+  applyPump(-PWM_STEP_PERCENT);
 }
 
-static void onPwm2Plus(lv_event_t *e) {
+static void onPumpPlus(lv_event_t *e) {
   (void)e;
-  applyPwm2(PWM_STEP_PERCENT);
+  applyPump(PWM_STEP_PERCENT);
 }
 
 static lv_obj_t *makeButton(lv_obj_t *parent, const char *txt, lv_event_cb_t cb) {
@@ -372,7 +376,7 @@ static void buildUi() {
   lv_obj_set_style_bg_color(lv_scr_act(), lv_color_hex(0x101820), 0);
 
   lv_obj_t *title = lv_label_create(lv_scr_act());
-  lv_label_set_text(title, "PH & Dual PWM Control");
+  lv_label_set_text(title, "PH & PWM/Pump Control");
   lv_obj_set_style_text_color(title, lv_color_hex(0xF2AA4C), 0);
   lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 14);
 
@@ -396,10 +400,10 @@ static void buildUi() {
   lv_obj_set_style_text_color(pwm1Label, lv_color_hex(0xD0D8E0), 0);
   lv_obj_align(pwm1Label, LV_ALIGN_TOP_LEFT, 20, 175);
 
-  pwm2Label = lv_label_create(lv_scr_act());
-  lv_label_set_text(pwm2Label, "PWM2 Duty: 0.0%");
-  lv_obj_set_style_text_color(pwm2Label, lv_color_hex(0xD0D8E0), 0);
-  lv_obj_align(pwm2Label, LV_ALIGN_TOP_LEFT, 20, 290);
+  pumpLabel = lv_label_create(lv_scr_act());
+  lv_label_set_text(pumpLabel, "Pump Speed: 0.0%");
+  lv_obj_set_style_text_color(pumpLabel, lv_color_hex(0xD0D8E0), 0);
+  lv_obj_align(pumpLabel, LV_ALIGN_TOP_LEFT, 20, 290);
 
   lv_obj_t *btn1Minus = makeButton(lv_scr_act(), "PWM1 -", onPwm1Minus);
   lv_obj_align(btn1Minus, LV_ALIGN_TOP_LEFT, 20, 210);
@@ -407,10 +411,10 @@ static void buildUi() {
   lv_obj_t *btn1Plus = makeButton(lv_scr_act(), "PWM1 +", onPwm1Plus);
   lv_obj_align(btn1Plus, LV_ALIGN_TOP_LEFT, 140, 210);
 
-  lv_obj_t *btn2Minus = makeButton(lv_scr_act(), "PWM2 -", onPwm2Minus);
+  lv_obj_t *btn2Minus = makeButton(lv_scr_act(), "Pump -", onPumpMinus);
   lv_obj_align(btn2Minus, LV_ALIGN_TOP_LEFT, 20, 325);
 
-  lv_obj_t *btn2Plus = makeButton(lv_scr_act(), "PWM2 +", onPwm2Plus);
+  lv_obj_t *btn2Plus = makeButton(lv_scr_act(), "Pump +", onPumpPlus);
   lv_obj_align(btn2Plus, LV_ALIGN_TOP_LEFT, 140, 325);
 }
 
@@ -449,8 +453,8 @@ static void updatePhReading() {
   lv_label_set_text(phLabel, phText);
   lv_label_set_text(voltageLabel, voltageText);
 
-  Serial.printf("PH voltage=%.6f V, pH=%.3f, PWM1=%.1f%%, PWM2=%.1f%%\n",
-                gLastVoltage, gLastPh, gPwm1Percent, gPwm2Percent);
+  Serial.printf("PH voltage=%.6f V, pH=%.3f, PWM1=%.1f%%, Pump=%.1f%%\n",
+                gLastVoltage, gLastPh, gPwm1Percent, gPumpPercent);
 }
 
 static void updateTemperatureReading() {
@@ -530,14 +534,14 @@ void setup() {
 
   buildUi();
 
-  if (!pwm1.begin() || !pwm2.begin()) {
-    Serial.println("PWM init failed");
+  if (!pwm1.begin() || !pump.begin()) {
+    Serial.println("PWM/pump init failed");
     while (true) {
       delay(1000);
     }
   }
   pwm1.setSpeedPercent(0.0f);
-  pwm2.setSpeedPercent(0.0f);
+  pump.setSpeedPercent(0.0f);
 
   ads.begin();
   ads.setPHCalibration(kPhCal);

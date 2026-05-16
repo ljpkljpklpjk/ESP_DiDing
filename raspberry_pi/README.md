@@ -7,7 +7,7 @@
 ```bash
 sudo apt update
 sudo apt install -y python3-tk python3-pip
-pip3 install pyserial platformio
+pip3 install pyserial
 ```
 
 ## 建立树莓派系统工程路径
@@ -24,7 +24,7 @@ pip3 install pyserial platformio
 cd /home/pi
 git clone -b codex/new_feature https://gitee.com/bidi2004/diding.git diding
 cd /home/pi/diding
-pip3 install pyserial platformio
+pip3 install pyserial
 ```
 
 如果已经从 GitHub 或其他地址克隆过，也可以在项目目录内改成 Gitee 更新源：
@@ -68,7 +68,7 @@ python3 raspberry_pi/titrator_gui.py --port /dev/ttyUSB0 --project-dir /home/pi/
 
 “检查 Gitee 更新”和“从 Gitee 更新代码”依赖 `git`，推荐当前项目目录为 `/home/pi/diding`，并使用 Gitee 仓库 `https://gitee.com/bidi2004/diding.git` 的 `codex/new_feature` 分支作为更新源。
 
-“更新 ESP32 下位机固件 OTA”会在界面内调用 PlatformIO，不需要打开终端。ESP32 IP 会优先从下位机遥测里的 `ip` 字段自动填入，也可以手动修改。OTA 执行时“系统更新”页会实时显示编译、链接、上传、完成或失败状态。
+“更新 ESP32 下位机固件 OTA”会在界面内上传仓库里的预编译固件，不需要在树莓派安装 PlatformIO 或现场编译。ESP32 IP 会优先从下位机遥测里的 `ip` 字段自动填入，也可以手动修改。OTA 执行时“系统更新”页会实时显示固件版本、连接、认证、上传百分比、完成或失败状态。
 
 ## 树莓派中转 OTA 更新
 
@@ -80,7 +80,21 @@ python3 raspberry_pi/titrator_gui.py --port /dev/ttyUSB0 --project-dir /home/pi/
 {"wifi_connected":true,"ip":"192.168.x.x","ota_ready":true}
 ```
 
-把项目代码同步到树莓派后，可以在“系统更新”页点击“更新 ESP32 下位机固件 OTA”。也可以在树莓派终端手动执行：
+把项目代码同步到树莓派后，可以在“系统更新”页点击“更新 ESP32 下位机固件 OTA”。该按钮会上传：
+
+```text
+firmware/esp32s3box_ota/firmware.bin
+```
+
+管理者在电脑上更新该固件文件：
+
+```bash
+python tools/release_firmware.py --project-dir D:/galgame/ESP_DiDing_codex_new_feature
+```
+
+之后提交并推送到 Gitee。树莓派点击“从 Gitee 更新代码”即可拉到最新预编译固件。
+
+也可以在树莓派终端手动执行：
 
 ```bash
 python3 raspberry_pi/ota_update.py --host 192.168.x.x

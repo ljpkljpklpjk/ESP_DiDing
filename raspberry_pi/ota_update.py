@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""Raspberry Pi bridge uploader for ESP32 ArduinoOTA firmware updates."""
+"""Upload the repository's prebuilt ESP32 firmware.bin via ArduinoOTA."""
 
 import argparse
-import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 
 DEFAULT_OTA_PASSWORD = "lab80700"
+FIRMWARE_RELATIVE_PATH = Path("firmware/esp32s3box_ota/firmware.bin")
 
 
 def default_project_dir() -> Path:
@@ -17,28 +17,26 @@ def default_project_dir() -> Path:
 
 def build_command(project_dir: Path, host: str, password: str) -> list[str]:
     return [
-        "platformio",
-        "run",
-        "-d",
-        str(project_dir),
-        "-e",
-        "esp32s3box_ota",
-        "-t",
-        "upload",
-        "--upload-port",
+        sys.executable,
+        str(project_dir / "raspberry_pi" / "ota_upload_bin.py"),
+        "--host",
         host,
+        "--file",
+        str(project_dir / FIRMWARE_RELATIVE_PATH),
+        "--password",
+        password,
     ]
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Build the ESP32 firmware on the Raspberry Pi and upload it via ArduinoOTA."
+        description="Upload the prebuilt ESP32 firmware from firmware/ via ArduinoOTA."
     )
     parser.add_argument("--host", required=True, help="ESP32 IP address shown in telemetry")
     parser.add_argument(
         "--project-dir",
         default=str(default_project_dir()),
-        help="PlatformIO project directory, defaults to the repository root",
+        help="Project directory, defaults to the repository root",
     )
     parser.add_argument(
         "--password",
@@ -48,21 +46,18 @@ def main() -> int:
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Print the PlatformIO command without running it",
+        help="Print the upload command without running it",
     )
     args = parser.parse_args()
 
-    if shutil.which("platformio") is None:
-        print("未找到 platformio，请先在树莓派安装：pip3 install platformio", file=sys.stderr)
-        return 1
-
     project_dir = Path(args.project_dir).expanduser().resolve()
-    if not (project_dir / "platformio.ini").exists():
-        print(f"未找到 platformio.ini：{project_dir}", file=sys.stderr)
+    firmware = project_dir / FIRMWARE_RELATIVE_PATH
+    if not firmware.exists():
+        print(f"未找到预编译固件：{firmware}", file=sys.stderr)
         return 1
 
     cmd = build_command(project_dir, args.host, args.password)
-    print("即将执行 OTA 上传：")
+    print("即将上传预编译 OTA 固件：")
     print(" ".join(cmd))
 
     if args.dry_run:

@@ -7,6 +7,8 @@ class DS18B20Module {
   explicit DS18B20Module(uint8_t dataPin);
 
   bool begin();
+  void requestTemperature();
+  float readLastCelsius();
   float readCelsius();
 
  private:

@@ -3,6 +3,7 @@
 
 import argparse
 import json
+import os
 import queue
 import shutil
 import subprocess
@@ -17,6 +18,8 @@ import serial
 
 DEFAULT_OTA_PASSWORD = "lab80700"
 DEFAULT_PROJECT_DIR = Path(__file__).resolve().parents[1]
+FIRMWARE_RELATIVE_PATH = Path("firmware/esp32s3box_ota/firmware.bin")
+FIRMWARE_VERSION_RELATIVE_PATH = Path("firmware/esp32s3box_ota/version.json")
 GITEE_REPO_URL = "https://gitee.com/bidi2004/diding.git"
 GITEE_BRANCH = "codex/new_feature"
 GITEE_REMOTE = "gitee"
@@ -187,26 +190,44 @@ class PiSystemManager:
             return code, out
         return self._run(["git", "pull", "--ff-only", GITEE_REMOTE, GITEE_BRANCH], cwd=self.project_dir)
 
-    def ota_command(self, host: str):
+    def firmware_path(self):
+        return self.project_dir / FIRMWARE_RELATIVE_PATH
+
+    def firmware_version_path(self):
+        return self.project_dir / FIRMWARE_VERSION_RELATIVE_PATH
+
+    def firmware_version_text(self):
+        path = self.firmware_version_path()
+        if not path.exists():
+            return "未找到固件版本信息"
+        try:
+            info = json.loads(path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            return f"固件版本信息读取失败: {exc}"
+        version = info.get("version", "未知版本")
+        built_at = info.get("built_at", "未知时间")
+        size = info.get("size_bytes", "未知大小")
+        desc = info.get("description", "")
+        return f"固件 {version}，构建时间 {built_at}，大小 {size} bytes，{desc}"
+
+    def ota_command(self, host: str, password: str):
         return [
-            "platformio",
-            "run",
-            "-d",
-            str(self.project_dir),
-            "-e",
-            "esp32s3box_ota",
-            "-t",
-            "upload",
-            "--upload-port",
+            "python3",
+            str(self.project_dir / "raspberry_pi" / "ota_upload_bin.py"),
+            "--host",
             host,
+            "--file",
+            str(self.firmware_path()),
+            "--password",
+            password,
         ]
 
     def ota_update(self, host: str, password: str):
         if not host:
             return 1, "请输入 ESP32 IP"
-        if not shutil.which("platformio"):
-            return 1, "未找到 platformio，请先安装：pip3 install platformio"
-        return self._run(self.ota_command(host))
+        if not self.firmware_path().exists():
+            return 1, f"未找到预编译固件：{self.firmware_path()}"
+        return self._run(self.ota_command(host, password))
 
     def _require_nmcli(self, cmd):
         if not shutil.which("nmcli"):
@@ -254,6 +275,10 @@ class TitratorApp(tk.Tk):
         self.project_dir_var = tk.StringVar(value=str(project_dir))
         self.esp32_ip_var = tk.StringVar(value="")
         self.ota_password_var = tk.StringVar(value=DEFAULT_OTA_PASSWORD)
+        self.ota_running = False
+        self.ota_start_time = 0.0
+        self.ota_last_output_time = 0.0
+        self.ota_button = None
 
         self._configure_style()
         self._build_ui()
@@ -400,13 +425,19 @@ class TitratorApp(tk.Tk):
         ttk.Entry(frame, textvariable=self.ota_password_var, width=24, show="*").grid(row=1, column=3, sticky="ew", padx=4, pady=8)
         ttk.Button(frame, text="检查 Gitee 更新", command=self.check_project_update).grid(row=2, column=0, padx=4, pady=10, sticky="ew")
         ttk.Button(frame, text="从 Gitee 更新代码", style="Primary.TButton", command=self.update_project).grid(row=2, column=1, padx=4, pady=10, sticky="ew")
-        ttk.Button(frame, text="更新 ESP32 固件 OTA", style="Primary.TButton", command=self.update_esp32_ota).grid(row=2, column=2, padx=4, pady=10, sticky="ew")
+        self.ota_button = ttk.Button(frame, text="更新 ESP32 固件 OTA", style="Primary.TButton", command=self.update_esp32_ota)
+        self.ota_button.grid(row=2, column=2, padx=4, pady=10, sticky="ew")
         ttk.Label(frame, text="OTA 进度").grid(row=3, column=0, sticky="w", padx=4, pady=8)
         ttk.Label(frame, textvariable=self.ota_progress_var, wraplength=800).grid(row=3, column=1, columnspan=3, sticky="ew", padx=4, pady=8)
         self.ota_progress_bar = ttk.Progressbar(frame, mode="indeterminate")
         self.ota_progress_bar.grid(row=4, column=1, columnspan=3, sticky="ew", padx=4, pady=8)
         ttk.Label(frame, text="状态").grid(row=5, column=0, sticky="w", padx=4, pady=8)
         ttk.Label(frame, textvariable=self.update_status_var, wraplength=800).grid(row=5, column=1, columnspan=3, sticky="ew", padx=4, pady=8)
+
+        log_frame = ttk.LabelFrame(root, text="OTA 实时输出", padding=10)
+        log_frame.pack(fill=tk.BOTH, expand=True, pady=(12, 0))
+        self.ota_log = tk.Text(log_frame, height=12, bg="#111827", fg="#d1d5db", insertbackground="#d1d5db", relief=tk.FLAT)
+        self.ota_log.pack(fill=tk.BOTH, expand=True)
 
     def _status_card(self, parent, row, col, title, var):
         card = ttk.Frame(parent, style="Card.TFrame", padding=12)
@@ -520,22 +551,38 @@ class TitratorApp(tk.Tk):
         self._run_system_task("更新上位机代码", self.system.update_project, self.update_status_var)
 
     def _run_ota_task(self, host):
+        if self.ota_running:
+            self.update_status_var.set("ESP32 OTA 正在运行，请等待当前任务完成")
+            return
         if not host:
             self.update_status_var.set("ESP32 OTA 更新失败: 请输入 ESP32 IP")
             return
-        if not shutil.which("platformio"):
-            self.update_status_var.set("ESP32 OTA 更新失败: 未找到 platformio，请先安装：pip3 install platformio")
+        if not self.system.firmware_path().exists():
+            self.update_status_var.set(f"ESP32 OTA 更新失败: 未找到预编译固件 {self.system.firmware_path()}")
             return
 
-        cmd = self.system.ota_command(host)
+        password = self.ota_password_var.get()
+        cmd = self.system.ota_command(host, password)
+        firmware_info = self.system.firmware_version_text()
+        self.ota_running = True
+        self.ota_start_time = time.time()
+        self.ota_last_output_time = self.ota_start_time
         self.update_status_var.set("ESP32 OTA 更新中...")
-        self.ota_progress_var.set("准备编译固件...")
+        self.ota_progress_var.set("准备上传预编译固件...")
+        if self.ota_button:
+            self.ota_button.state(["disabled"])
+        self.ota_log.delete("1.0", tk.END)
+        self._append_ota_log(firmware_info)
+        self._append_ota_log("执行命令: " + " ".join(cmd))
         self.ota_progress_bar.start(10)
+        self._update_ota_heartbeat()
 
         def worker():
             last_line = ""
             code = 1
             try:
+                env = os.environ.copy()
+                env["PYTHONUNBUFFERED"] = "1"
                 process = subprocess.Popen(
                     cmd,
                     cwd=self.system.project_dir,
@@ -543,6 +590,7 @@ class TitratorApp(tk.Tk):
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     bufsize=1,
+                    env=env,
                 )
                 assert process.stdout is not None
                 for line in process.stdout:
@@ -558,37 +606,77 @@ class TitratorApp(tk.Tk):
                 code = 1
 
             def finish():
+                self.ota_running = False
                 self.ota_progress_bar.stop()
+                if self.ota_button:
+                    self.ota_button.state(["!disabled"])
                 if code == 0:
                     self.ota_progress_var.set("OTA 完成，等待 ESP32 重启并恢复遥测")
                     self.update_status_var.set("ESP32 OTA 更新完成")
+                    self._append_ota_log("OTA 任务完成")
                 else:
                     self.ota_progress_var.set(f"OTA 失败: {last_line or '无输出'}")
                     self.update_status_var.set("ESP32 OTA 更新失败")
+                    self._append_ota_log(f"OTA 任务失败: {last_line or '无输出'}")
 
             self.after(0, finish)
 
         threading.Thread(target=worker, daemon=True).start()
 
     def _update_ota_progress(self, progress, line):
+        self.ota_last_output_time = time.time()
         self.ota_progress_var.set(progress)
         self.update_status_var.set(line)
+        self._append_ota_log(line)
+
+    def _update_ota_heartbeat(self):
+        if not self.ota_running:
+            return
+        now = time.time()
+        elapsed = int(now - self.ota_start_time)
+        idle = int(now - self.ota_last_output_time)
+        self.ota_progress_var.set(f"OTA 运行中，已用 {elapsed}s，最近输出 {idle}s 前")
+        self.after(1000, self._update_ota_heartbeat)
+
+    def _append_ota_log(self, text):
+        self.ota_log.insert(tk.END, text + "\n")
+        self.ota_log.see(tk.END)
 
     @staticmethod
     def _ota_progress_text(line):
         lower = line.lower()
+        if "固件文件" in line or "固件大小" in line or "固件 md5" in lower:
+            return "正在检查预编译固件..."
+        if "发送 ota 邀请" in lower or "已接受 ota 邀请" in lower:
+            return "正在连接 ESP32 OTA 服务..."
+        if "认证" in line:
+            return line
+        if "等待 esp32 建立上传连接" in lower or "已连接" in line:
+            return "ESP32 已连接，准备上传..."
+        if "ota 上传进度" in lower:
+            return line
+        if "ota 上传完成" in lower:
+            return "OTA 上传完成，等待写入结果..."
+        if "ota 完成" in lower:
+            return "OTA 完成，ESP32 将重启"
+        if "processing esp32s3box_ota" in lower:
+            return "正在准备 OTA 编译环境..."
+        if "verbose mode can be enabled" in lower:
+            return "PlatformIO 已开始执行..."
         if "building" in lower or "compiling" in lower:
             return "正在编译固件..."
         if "linking" in lower:
             return "正在链接固件..."
-        if "checking size" in lower or "memory usage" in lower:
+        if "checking size" in lower or "memory usage" in lower or lower.startswith("ram:") or lower.startswith("flash:"):
             return "正在检查固件大小..."
+        if "configuring upload protocol" in lower:
+            return "正在配置 OTA 上传协议..."
         if "uploading" in lower or "upload" in lower:
             return "正在 OTA 上传到 ESP32..."
         if "success" in lower:
             return "OTA/编译成功"
         if "error" in lower or "failed" in lower:
-            return "OTA 出错，请查看状态输出"
+            return "OTA 出错，请查看实时输出"
         return line
 
     def update_esp32_ota(self):

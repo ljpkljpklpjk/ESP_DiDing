@@ -2,9 +2,9 @@
 
 ## 版本信息
 
-- 版本号：v2026.05.16.3
-- 提交时间：2026-05-16 16:31:26 +0800
-- 更新内容：进一步优化丝杆滑台运行平滑性，并美化树莓派上位机界面。
+- 版本号：v2026.05.16.5
+- 提交时间：2026-05-16 17:28:00 +0800
+- 更新内容：支持预编译固件发布，树莓派端无需 PlatformIO 编译即可 OTA 上传。
 
 本仓库为基于 ESP32-S3 主控的自动滴定仪下位机测试固件。当前通信方式为串口 JSON Lines：树莓派上位机按行下发 JSON 控制指令，ESP32 按行回传遥测、确认和错误信息。
 
@@ -222,22 +222,29 @@ C:/Users/MI/.platformio/penv/Scripts/platformio.exe run -d D:/galgame/ESP_DiDing
 
 更推荐的远程方式是让树莓派作为中转：用户在树莓派连接的屏幕界面上点击更新，树莓派在实验室局域网内给 ESP32 OTA 上传。这样 ESP32 不需要暴露到公网。
 
-在树莓派安装依赖：
-
-```bash
-pip3 install platformio
-```
-
-树莓派端推荐直接从 Gitee 克隆完整 PlatformIO 工程，避免树莓派访问 GitHub：
+树莓派端不再需要 PlatformIO 编译链，只需要拉取管理者已经发布到仓库里的预编译固件：
 
 ```bash
 cd /home/pi
 git clone -b codex/new_feature https://gitee.com/bidi2004/diding.git diding
 cd /home/pi/diding
-pip3 install pyserial platformio
+pip3 install pyserial
 ```
 
-之后树莓派界面里的“检查 Gitee 更新”和“从 Gitee 更新代码”会从 `https://gitee.com/bidi2004/diding.git` 拉取 `codex/new_feature` 分支。
+管理者在电脑上生成并发布固件：
+
+```bash
+python tools/release_firmware.py --project-dir D:/galgame/ESP_DiDing_codex_new_feature
+```
+
+脚本会编译 `esp32s3box_ota` 环境，并把固件复制到：
+
+```text
+firmware/esp32s3box_ota/firmware.bin
+firmware/esp32s3box_ota/version.json
+```
+
+之后提交并推送到 Gitee/GitHub。树莓派界面里的“检查 Gitee 更新”和“从 Gitee 更新代码”会从 `https://gitee.com/bidi2004/diding.git` 拉取 `codex/new_feature` 分支和最新预编译固件。
 
 同步项目代码到树莓派后执行：
 
@@ -245,7 +252,7 @@ pip3 install pyserial platformio
 python3 raspberry_pi/ota_update.py --host 192.168.x.x
 ```
 
-其中 `192.168.x.x` 换成 ESP32 遥测中显示的 IP。
+其中 `192.168.x.x` 换成 ESP32 遥测中显示的 IP。树莓派上位机界面的“更新 ESP32 固件 OTA”也会使用同一个预编译固件直接上传，不会在树莓派上编译。
 
 ## 编译
 

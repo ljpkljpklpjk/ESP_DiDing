@@ -41,8 +41,12 @@ static constexpr bool SERIAL_DEBUG_TEXT = false;
 static constexpr uint32_t TELEMETRY_INTERVAL_MS = 1000;
 static constexpr uint32_t WIFI_RETRY_INTERVAL_MS = 10000;
 static constexpr size_t SERIAL_RX_BUF_SIZE = 320;
-static constexpr size_t SERIAL_BYTES_PER_LOOP = 48;
+static constexpr size_t SERIAL_BYTES_PER_LOOP = 32;
 static constexpr uint32_t OTA_HANDLE_INTERVAL_MS = 10;
+static constexpr uint32_t OTA_HANDLE_MOVING_INTERVAL_MS = 50;
+static constexpr uint32_t ADS1220_READ_TIMEOUT_MS = 40;
+static constexpr uint32_t TEMP_REQUEST_INTERVAL_MS = 1000;
+static constexpr uint32_t TEMP_CONVERSION_DELAY_MS = 800;
 static constexpr uint8_t DS18B20_PIN = 2;
 
 static const char *WIFI_SSID = "Lab807_2.4G";
@@ -89,6 +93,8 @@ static uint32_t gLastSampleMs = 0;
 static float gLastVoltage = NAN;
 static float gLastPh = NAN;
 static uint32_t gLastTempSampleMs = 0;
+static uint32_t gLastTempRequestMs = 0;
+static bool gTempConversionPending = false;
 static float gLastTempC = NAN;
 static uint32_t gLastTelemetryMs = 0;
 static uint32_t gLastWifiRetryMs = 0;
@@ -318,7 +324,8 @@ static void setupOta() {
 
 static void updateOta() {
   const uint32_t now = millis();
-  if (now - gLastOtaHandleMs < OTA_HANDLE_INTERVAL_MS) {
+  const uint32_t interval = sliderBusy() ? OTA_HANDLE_MOVING_INTERVAL_MS : OTA_HANDLE_INTERVAL_MS;
+  if (now - gLastOtaHandleMs < interval) {
     return;
   }
   gLastOtaHandleMs = now;
@@ -536,7 +543,7 @@ static void updatePhReading() {
   }
   gLastSampleMs = now;
 
-  const float v = ads.readVoltage(ADS1220Module::AIN0_AIN1);
+  const float v = ads.readVoltage(ADS1220Module::AIN0_AIN1, ADS1220_READ_TIMEOUT_MS);
   if (isnan(v)) {
     gLastVoltage = NAN;
     gLastPh = NAN;
@@ -557,12 +564,20 @@ static void updatePhReading() {
 
 static void updateTemperatureReading() {
   const uint32_t now = millis();
-  if (now - gLastTempSampleMs < 1000) {
+  if (!gTempConversionPending && now - gLastTempRequestMs >= TEMP_REQUEST_INTERVAL_MS) {
+    ds18b20.requestTemperature();
+    gLastTempRequestMs = now;
+    gTempConversionPending = true;
     return;
   }
-  gLastTempSampleMs = now;
 
-  gLastTempC = ds18b20.readCelsius();
+  if (!gTempConversionPending || now - gLastTempRequestMs < TEMP_CONVERSION_DELAY_MS) {
+    return;
+  }
+
+  gTempConversionPending = false;
+  gLastTempSampleMs = now;
+  gLastTempC = ds18b20.readLastCelsius();
   if (isnan(gLastTempC)) {
     if (SERIAL_DEBUG_TEXT) {
       Serial.println("DS18B20 read failed");
@@ -639,6 +654,19 @@ void setup() {
 
 void loop() {
   runSlider();
+
+  if (sliderBusy()) {
+    processSerialInput();
+    runSlider();
+    updateOta();
+    runSlider();
+    updateWifi();
+    runSlider();
+    updateSliderCompletion();
+    runSlider();
+    return;
+  }
+
   processSerialInput();
   runSlider();
   updateOta();
@@ -647,12 +675,9 @@ void loop() {
   runSlider();
   updateSliderCompletion();
   runSlider();
-
-  if (!sliderBusy()) {
-    updatePhReading();
-    runSlider();
-    updateTemperatureReading();
-    runSlider();
-    updateSerialTelemetry();
-  }
+  updatePhReading();
+  runSlider();
+  updateTemperatureReading();
+  runSlider();
+  updateSerialTelemetry();
 }

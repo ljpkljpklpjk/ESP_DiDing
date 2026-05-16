@@ -28,15 +28,26 @@ bool DS18B20Module::begin() {
   return ready_;
 }
 
-float DS18B20Module::readCelsius() {
+void DS18B20Module::requestTemperature() {
+  if (!ready_ || !impl_) {
+    return;
+  }
+  impl_->dallas.requestTemperatures();
+}
+
+float DS18B20Module::readLastCelsius() {
   if (!ready_ || !impl_) {
     return NAN;
   }
 
-  impl_->dallas.requestTemperatures();
   const float t = impl_->dallas.getTempCByIndex(0);
   if (t == DEVICE_DISCONNECTED_C) {
     return NAN;
   }
   return t;
+}
+
+float DS18B20Module::readCelsius() {
+  requestTemperature();
+  return readLastCelsius();
 }

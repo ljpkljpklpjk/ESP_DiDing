@@ -17,6 +17,9 @@ import serial
 
 DEFAULT_OTA_PASSWORD = "lab80700"
 DEFAULT_PROJECT_DIR = Path(__file__).resolve().parents[1]
+GITEE_REPO_URL = "https://gitee.com/bidi2004/diding.git"
+GITEE_BRANCH = "codex/new_feature"
+GITEE_REMOTE = "gitee"
 
 
 class SerialWorker:
@@ -84,21 +87,48 @@ class PiSystemManager:
         return completed.returncode, completed.stdout.strip()
 
     def wifi_status(self):
+        radio = "未知"
+        connected_ssid = ""
+        ip_addr = ""
+
         if shutil.which("nmcli"):
-            radio_code, radio = self._run(["nmcli", "radio", "wifi"])
-            dev_code, dev = self._run(["nmcli", "-t", "-f", "ACTIVE,SSID", "dev", "wifi"])
-            active_ssids = []
-            if dev_code == 0:
-                for line in dev.splitlines():
-                    active, _, ssid = line.partition(":")
-                    if active == "yes" and ssid:
-                        active_ssids.append(ssid)
-            connected = ", ".join(active_ssids) if active_ssids else "未连接"
-            return f"WiFi: {radio if radio_code == 0 else '未知'}，当前连接: {connected}"
+            radio_code, radio_out = self._run(["nmcli", "radio", "wifi"])
+            if radio_code == 0 and radio_out:
+                radio = radio_out
+
+            code, out = self._run(["nmcli", "-t", "-f", "DEVICE,TYPE,STATE,CONNECTION", "dev", "status"])
+            if code == 0:
+                for line in out.splitlines():
+                    parts = line.split(":", 3)
+                    if len(parts) == 4:
+                        _, dev_type, state, connection = parts
+                        if dev_type == "wifi" and state in ("connected", "已连接") and connection:
+                            connected_ssid = connection
+                            break
+
+            if not connected_ssid:
+                code, out = self._run(["nmcli", "-t", "-f", "ACTIVE,SSID", "connection", "show", "--active"])
+                if code == 0:
+                    for line in out.splitlines():
+                        active, _, ssid = line.partition(":")
+                        if active == "yes" and ssid:
+                            connected_ssid = ssid
+                            break
+
         if shutil.which("iwgetid"):
             code, out = self._run(["iwgetid", "-r"])
-            return f"当前连接: {out}" if code == 0 and out else "当前未连接 WiFi"
-        return "未找到 nmcli/iwgetid，无法读取 WiFi 状态"
+            if code == 0 and out:
+                connected_ssid = out
+
+        if shutil.which("hostname"):
+            code, out = self._run(["hostname", "-I"])
+            if code == 0 and out:
+                ip_addr = out.split()[0]
+
+        if connected_ssid:
+            ip_text = f"，IP: {ip_addr}" if ip_addr else ""
+            return f"WiFi: {radio}，当前连接: {connected_ssid}{ip_text}"
+        return f"WiFi: {radio}，当前未连接"
 
     def wifi_on(self):
         return self._require_nmcli(["nmcli", "radio", "wifi", "on"])
@@ -114,25 +144,48 @@ class PiSystemManager:
             cmd.extend(["password", password])
         return self._require_nmcli(cmd)
 
+    def ensure_gitee_remote(self):
+        if not shutil.which("git"):
+            return 1, "未找到 git"
+        if not (self.project_dir / ".git").exists():
+            return 1, f"当前项目路径不是 Git 仓库：{self.project_dir}"
+
+        code, remotes = self._run(["git", "remote"], cwd=self.project_dir)
+        if code != 0:
+            return code, remotes
+
+        remote_names = set(remotes.split())
+        if GITEE_REMOTE in remote_names:
+            code, out = self._run(["git", "remote", "set-url", GITEE_REMOTE, GITEE_REPO_URL], cwd=self.project_dir)
+        else:
+            code, out = self._run(["git", "remote", "add", GITEE_REMOTE, GITEE_REPO_URL], cwd=self.project_dir)
+        if code != 0:
+            return code, out
+
+        self._run(["git", "fetch", GITEE_REMOTE, GITEE_BRANCH], cwd=self.project_dir)
+        self._run(["git", "branch", "--set-upstream-to", f"{GITEE_REMOTE}/{GITEE_BRANCH}", GITEE_BRANCH], cwd=self.project_dir)
+        return 0, f"已设置 Gitee 更新源：{GITEE_REPO_URL} 分支 {GITEE_BRANCH}"
+
     def check_git_update(self):
         if not shutil.which("git"):
             return 1, "未找到 git"
-        code, out = self._run(["git", "fetch"], cwd=self.project_dir)
+        self.ensure_gitee_remote()
+        code, out = self._run(["git", "fetch", GITEE_REMOTE, GITEE_BRANCH], cwd=self.project_dir)
         if code != 0:
             return code, out
-        code, upstream = self._run(["git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"], cwd=self.project_dir)
-        if code != 0:
-            return code, "当前分支没有配置上游分支，无法检查更新"
         _, local = self._run(["git", "rev-parse", "HEAD"], cwd=self.project_dir)
-        _, remote = self._run(["git", "rev-parse", upstream], cwd=self.project_dir)
+        _, remote = self._run(["git", "rev-parse", f"{GITEE_REMOTE}/{GITEE_BRANCH}"], cwd=self.project_dir)
         if local == remote:
-            return 0, "当前已经是最新版本"
-        return 0, f"发现新版本：{local[:7]} -> {remote[:7]}"
+            return 0, "当前已经是 Gitee 最新版本"
+        return 0, f"Gitee 发现新版本：{local[:7]} -> {remote[:7]}"
 
     def update_project(self):
         if not shutil.which("git"):
             return 1, "未找到 git"
-        return self._run(["git", "pull", "--ff-only"], cwd=self.project_dir)
+        code, out = self.ensure_gitee_remote()
+        if code != 0:
+            return code, out
+        return self._run(["git", "pull", "--ff-only", GITEE_REMOTE, GITEE_BRANCH], cwd=self.project_dir)
 
     def ota_update(self, host: str, password: str):
         if not host:
@@ -297,8 +350,8 @@ class TitratorApp(tk.Tk):
         ttk.Entry(frame, textvariable=self.esp32_ip_var, width=24).grid(row=1, column=1, sticky="w", padx=4, pady=4)
         ttk.Label(frame, text="OTA 密码").grid(row=1, column=2, sticky="w", padx=4, pady=4)
         ttk.Entry(frame, textvariable=self.ota_password_var, width=24, show="*").grid(row=1, column=3, sticky="w", padx=4, pady=4)
-        ttk.Button(frame, text="检查项目更新", command=self.check_project_update).grid(row=2, column=0, padx=4, pady=8)
-        ttk.Button(frame, text="更新上位机代码", command=self.update_project).grid(row=2, column=1, padx=4, pady=8)
+        ttk.Button(frame, text="检查 Gitee 更新", command=self.check_project_update).grid(row=2, column=0, padx=4, pady=8)
+        ttk.Button(frame, text="从 Gitee 更新代码", command=self.update_project).grid(row=2, column=1, padx=4, pady=8)
         ttk.Button(frame, text="更新 ESP32 固件 OTA", command=self.update_esp32_ota).grid(row=2, column=2, padx=4, pady=8)
         ttk.Label(frame, text="状态").grid(row=3, column=0, sticky="w", padx=4, pady=4)
         ttk.Label(frame, textvariable=self.update_status_var, wraplength=800).grid(row=3, column=1, columnspan=3, sticky="w", padx=4, pady=4)

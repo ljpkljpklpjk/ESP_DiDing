@@ -10,6 +10,34 @@ sudo apt install -y python3-tk python3-pip
 pip3 install pyserial platformio
 ```
 
+## 建立树莓派系统工程路径
+
+树莓派端推荐固定把完整工程放在：
+
+```bash
+/home/pi/diding
+```
+
+第一次部署时执行：
+
+```bash
+cd /home/pi
+git clone -b codex/new_feature https://gitee.com/bidi2004/diding.git diding
+cd /home/pi/diding
+pip3 install pyserial platformio
+```
+
+如果已经从 GitHub 或其他地址克隆过，也可以在项目目录内改成 Gitee 更新源：
+
+```bash
+cd /home/pi/diding
+git remote add gitee https://gitee.com/bidi2004/diding.git 2>/dev/null || git remote set-url gitee https://gitee.com/bidi2004/diding.git
+git fetch gitee codex/new_feature
+git branch --set-upstream-to=gitee/codex/new_feature codex/new_feature
+```
+
+之后树莓派界面里的“检查 Gitee 更新”和“从 Gitee 更新代码”都会使用 Gitee，不需要访问 GitHub。
+
 ## 运行
 
 上位机现在是树莓派屏幕上的一体化界面，包含：
@@ -21,13 +49,13 @@ pip3 install pyserial platformio
 ESP32 通过 USB 连接树莓派时，串口通常是 `/dev/ttyACM0` 或 `/dev/ttyUSB0`。
 
 ```bash
-python3 titrator_gui.py --port /dev/ttyACM0
+python3 raspberry_pi/titrator_gui.py --port /dev/ttyACM0 --project-dir /home/pi/diding
 ```
 
 或者：
 
 ```bash
-python3 titrator_gui.py --port /dev/ttyUSB0
+python3 raspberry_pi/titrator_gui.py --port /dev/ttyUSB0 --project-dir /home/pi/diding
 ```
 
 ## 系统功能说明
@@ -38,7 +66,7 @@ python3 titrator_gui.py --port /dev/ttyUSB0
 
 ### 系统更新
 
-“检查项目更新”和“更新上位机代码”依赖 `git`，要求当前项目目录是 Git 仓库并配置了上游分支。
+“检查 Gitee 更新”和“从 Gitee 更新代码”依赖 `git`，推荐当前项目目录为 `/home/pi/diding`，并使用 Gitee 仓库 `https://gitee.com/bidi2004/diding.git` 的 `codex/new_feature` 分支作为更新源。
 
 “更新 ESP32 下位机固件 OTA”会在界面内调用 PlatformIO，不需要打开终端。ESP32 IP 会优先从下位机遥测里的 `ip` 字段自动填入，也可以手动修改。
 

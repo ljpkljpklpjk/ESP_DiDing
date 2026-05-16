@@ -1,5 +1,11 @@
 # ESP32-S3滴定仪测试固件
 
+## 版本信息
+
+- 版本号：v2026.05.16.1
+- 提交时间：2026-05-16 16:06:40 +0800
+- 更新内容：使用 Gitee 作为树莓派系统更新源，并修复 WiFi 已连接但界面显示未连接的问题。
+
 本仓库为基于 ESP32-S3 主控的自动滴定仪下位机测试固件。当前通信方式为串口 JSON Lines：树莓派上位机按行下发 JSON 控制指令，ESP32 按行回传遥测、确认和错误信息。
 
 ## 已支持功能
@@ -221,6 +227,17 @@ C:/Users/MI/.platformio/penv/Scripts/platformio.exe run -d D:/galgame/ESP_DiDing
 ```bash
 pip3 install platformio
 ```
+
+树莓派端推荐直接从 Gitee 克隆完整 PlatformIO 工程，避免树莓派访问 GitHub：
+
+```bash
+cd /home/pi
+git clone -b codex/new_feature https://gitee.com/bidi2004/diding.git diding
+cd /home/pi/diding
+pip3 install pyserial platformio
+```
+
+之后树莓派界面里的“检查 Gitee 更新”和“从 Gitee 更新代码”会从 `https://gitee.com/bidi2004/diding.git` 拉取 `codex/new_feature` 分支。
 
 同步项目代码到树莓派后执行：
 

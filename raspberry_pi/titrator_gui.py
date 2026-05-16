@@ -142,10 +142,45 @@ class PiSystemManager:
     def connect_wifi(self, ssid: str, password: str):
         if not ssid:
             return 1, "请输入 WiFi 名称"
-        cmd = ["nmcli", "dev", "wifi", "connect", ssid]
         if password:
-            cmd.extend(["password", password])
-        return self._require_nmcli(cmd)
+            code, _ = self._require_nmcli(["nmcli", "connection", "show", ssid])
+            if code == 0:
+                code, out = self._require_nmcli([
+                    "nmcli",
+                    "connection",
+                    "modify",
+                    ssid,
+                    "connection.type",
+                    "802-11-wireless",
+                    "802-11-wireless.ssid",
+                    ssid,
+                    "802-11-wireless-security.key-mgmt",
+                    "wpa-psk",
+                    "802-11-wireless-security.psk",
+                    password,
+                ])
+            else:
+                code, out = self._require_nmcli([
+                    "nmcli",
+                    "connection",
+                    "add",
+                    "type",
+                    "wifi",
+                    "ifname",
+                    "*",
+                    "con-name",
+                    ssid,
+                    "ssid",
+                    ssid,
+                    "wifi-sec.key-mgmt",
+                    "wpa-psk",
+                    "wifi-sec.psk",
+                    password,
+                ])
+            if code != 0:
+                return code, out
+            return self._require_nmcli(["nmcli", "connection", "up", ssid])
+        return self._require_nmcli(["nmcli", "dev", "wifi", "connect", ssid])
 
     def ensure_gitee_remote(self):
         if not shutil.which("git"):

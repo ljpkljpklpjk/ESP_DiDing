@@ -68,7 +68,7 @@ python3 raspberry_pi/titrator_gui.py --port /dev/ttyUSB0 --project-dir /home/pi/
 
 “检查 Gitee 更新”和“从 Gitee 更新代码”依赖 `git`，推荐当前项目目录为 `/home/pi/diding`，并使用 Gitee 仓库 `https://gitee.com/bidi2004/diding.git` 的 `codex/new_feature` 分支作为更新源。
 
-“更新 ESP32 下位机固件 OTA”会在界面内调用 PlatformIO，不需要打开终端。ESP32 IP 会优先从下位机遥测里的 `ip` 字段自动填入，也可以手动修改。
+“更新 ESP32 下位机固件 OTA”会在界面内调用 PlatformIO，不需要打开终端。ESP32 IP 会优先从下位机遥测里的 `ip` 字段自动填入，也可以手动修改。OTA 执行时“系统更新”页会实时显示编译、链接、上传、完成或失败状态。
 
 ## 树莓派中转 OTA 更新
 

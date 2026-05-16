@@ -187,12 +187,8 @@ class PiSystemManager:
             return code, out
         return self._run(["git", "pull", "--ff-only", GITEE_REMOTE, GITEE_BRANCH], cwd=self.project_dir)
 
-    def ota_update(self, host: str, password: str):
-        if not host:
-            return 1, "请输入 ESP32 IP"
-        if not shutil.which("platformio"):
-            return 1, "未找到 platformio，请先安装：pip3 install platformio"
-        cmd = [
+    def ota_command(self, host: str):
+        return [
             "platformio",
             "run",
             "-d",
@@ -204,7 +200,13 @@ class PiSystemManager:
             "--upload-port",
             host,
         ]
-        return self._run(cmd)
+
+    def ota_update(self, host: str, password: str):
+        if not host:
+            return 1, "请输入 ESP32 IP"
+        if not shutil.which("platformio"):
+            return 1, "未找到 platformio，请先安装：pip3 install platformio"
+        return self._run(self.ota_command(host))
 
     def _require_nmcli(self, cmd):
         if not shutil.which("nmcli"):
@@ -246,6 +248,7 @@ class TitratorApp(tk.Tk):
         self.wifi_ssid_var = tk.StringVar(value="Lab807_2.4G")
         self.wifi_password_var = tk.StringVar(value="")
         self.update_status_var = tk.StringVar(value="未检查")
+        self.ota_progress_var = tk.StringVar(value="OTA 未开始")
         self.project_dir_var = tk.StringVar(value=str(project_dir))
         self.esp32_ip_var = tk.StringVar(value="")
         self.ota_password_var = tk.StringVar(value=DEFAULT_OTA_PASSWORD)
@@ -353,8 +356,12 @@ class TitratorApp(tk.Tk):
         ttk.Button(frame, text="检查 Gitee 更新", command=self.check_project_update).grid(row=2, column=0, padx=4, pady=8)
         ttk.Button(frame, text="从 Gitee 更新代码", command=self.update_project).grid(row=2, column=1, padx=4, pady=8)
         ttk.Button(frame, text="更新 ESP32 固件 OTA", command=self.update_esp32_ota).grid(row=2, column=2, padx=4, pady=8)
-        ttk.Label(frame, text="状态").grid(row=3, column=0, sticky="w", padx=4, pady=4)
-        ttk.Label(frame, textvariable=self.update_status_var, wraplength=800).grid(row=3, column=1, columnspan=3, sticky="w", padx=4, pady=4)
+        ttk.Label(frame, text="OTA 进度").grid(row=3, column=0, sticky="w", padx=4, pady=4)
+        ttk.Label(frame, textvariable=self.ota_progress_var, wraplength=800).grid(row=3, column=1, columnspan=3, sticky="w", padx=4, pady=4)
+        self.ota_progress_bar = ttk.Progressbar(frame, mode="indeterminate")
+        self.ota_progress_bar.grid(row=4, column=1, columnspan=3, sticky="ew", padx=4, pady=4)
+        ttk.Label(frame, text="状态").grid(row=5, column=0, sticky="w", padx=4, pady=4)
+        ttk.Label(frame, textvariable=self.update_status_var, wraplength=800).grid(row=5, column=1, columnspan=3, sticky="w", padx=4, pady=4)
 
     def _label_row(self, parent, row, label1, var1, label2, var2, label3, var3):
         labels = [(label1, var1), (label2, var2), (label3, var3)]
@@ -455,11 +462,82 @@ class TitratorApp(tk.Tk):
         self.system.project_dir = Path(self.project_dir_var.get()).expanduser().resolve()
         self._run_system_task("更新上位机代码", self.system.update_project, self.update_status_var)
 
+    def _run_ota_task(self, host):
+        if not host:
+            self.update_status_var.set("ESP32 OTA 更新失败: 请输入 ESP32 IP")
+            return
+        if not shutil.which("platformio"):
+            self.update_status_var.set("ESP32 OTA 更新失败: 未找到 platformio，请先安装：pip3 install platformio")
+            return
+
+        cmd = self.system.ota_command(host)
+        self.update_status_var.set("ESP32 OTA 更新中...")
+        self.ota_progress_var.set("准备编译固件...")
+        self.ota_progress_bar.start(10)
+
+        def worker():
+            last_line = ""
+            code = 1
+            try:
+                process = subprocess.Popen(
+                    cmd,
+                    cwd=self.system.project_dir,
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    bufsize=1,
+                )
+                assert process.stdout is not None
+                for line in process.stdout:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    last_line = line
+                    progress = self._ota_progress_text(line)
+                    self.after(0, lambda p=progress, l=line: self._update_ota_progress(p, l))
+                code = process.wait()
+            except Exception as exc:
+                last_line = str(exc)
+                code = 1
+
+            def finish():
+                self.ota_progress_bar.stop()
+                if code == 0:
+                    self.ota_progress_var.set("OTA 完成，等待 ESP32 重启并恢复遥测")
+                    self.update_status_var.set("ESP32 OTA 更新完成")
+                else:
+                    self.ota_progress_var.set(f"OTA 失败: {last_line or '无输出'}")
+                    self.update_status_var.set("ESP32 OTA 更新失败")
+
+            self.after(0, finish)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _update_ota_progress(self, progress, line):
+        self.ota_progress_var.set(progress)
+        self.update_status_var.set(line)
+
+    @staticmethod
+    def _ota_progress_text(line):
+        lower = line.lower()
+        if "building" in lower or "compiling" in lower:
+            return "正在编译固件..."
+        if "linking" in lower:
+            return "正在链接固件..."
+        if "checking size" in lower or "memory usage" in lower:
+            return "正在检查固件大小..."
+        if "uploading" in lower or "upload" in lower:
+            return "正在 OTA 上传到 ESP32..."
+        if "success" in lower:
+            return "OTA/编译成功"
+        if "error" in lower or "failed" in lower:
+            return "OTA 出错，请查看状态输出"
+        return line
+
     def update_esp32_ota(self):
         self.system.project_dir = Path(self.project_dir_var.get()).expanduser().resolve()
         host = self.esp32_ip_var.get().strip()
-        password = self.ota_password_var.get()
-        self._run_system_task("ESP32 OTA 更新", lambda: self.system.ota_update(host, password), self.update_status_var)
+        self._run_ota_task(host)
 
     def _poll_serial(self):
         while True:

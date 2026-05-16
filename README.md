@@ -203,13 +203,13 @@ python3 raspberry_pi/titrator_gui.py --port /dev/ttyACM0
 远程上传示例，优先使用串口遥测里显示的 IP：
 
 ```bash
-C:/Users/MI/.platformio/penv/Scripts/platformio.exe run -d D:/galgame/ESP_DiDing_codex_new_feature -t upload --upload-protocol espota --upload-port 192.168.x.x --upload-flags "--auth=lab80700"
+C:/Users/MI/.platformio/penv/Scripts/platformio.exe run -d D:/galgame/ESP_DiDing_codex_new_feature -e esp32s3box_ota -t upload --upload-port 192.168.x.x
 ```
 
 如果电脑能解析 mDNS，也可以尝试：
 
 ```bash
-C:/Users/MI/.platformio/penv/Scripts/platformio.exe run -d D:/galgame/ESP_DiDing_codex_new_feature -t upload --upload-protocol espota --upload-port esp-diding.local --upload-flags "--auth=lab80700"
+C:/Users/MI/.platformio/penv/Scripts/platformio.exe run -d D:/galgame/ESP_DiDing_codex_new_feature -e esp32s3box_ota -t upload --upload-port esp-diding.local
 ```
 
 ### 树莓派中转 OTA

@@ -144,14 +144,12 @@ class PiSystemManager:
             "run",
             "-d",
             str(self.project_dir),
+            "-e",
+            "esp32s3box_ota",
             "-t",
             "upload",
-            "--upload-protocol",
-            "espota",
             "--upload-port",
             host,
-            "--upload-flags",
-            f"--auth={password}",
         ]
         return self._run(cmd)
 
@@ -176,14 +174,17 @@ class TitratorApp(tk.Tk):
         self.ph_var = tk.StringVar(value="--")
         self.temp_var = tk.StringVar(value="--")
         self.voltage_var = tk.StringVar(value="--")
-        self.pwm_var = tk.StringVar(value="0")
-        self.pump_var = tk.StringVar(value="0")
+        self.pwm_display_var = tk.StringVar(value="0")
+        self.pump_display_var = tk.StringVar(value="0")
+        self.pwm_set_var = tk.StringVar(value="0")
+        self.pump_set_var = tk.StringVar(value="0")
         self.slider_pos_var = tk.StringVar(value="--")
         self.slider_target_var = tk.StringVar(value="--")
         self.slider_distance_var = tk.StringVar(value="--")
         self.slider_enabled_var = tk.StringVar(value="--")
         self.slider_moving_var = tk.StringVar(value="--")
-        self.slider_speed_var = tk.StringVar(value="1000")
+        self.slider_speed_display_var = tk.StringVar(value="1000")
+        self.slider_speed_set_var = tk.StringVar(value="1000")
         self.slider_accel_var = tk.StringVar(value="500")
         self.move_mm_var = tk.StringVar(value="10")
         self.move_sec_var = tk.StringVar(value="20")
@@ -220,18 +221,18 @@ class TitratorApp(tk.Tk):
         telemetry.pack(fill=tk.X)
 
         self._label_row(telemetry, 0, "pH", self.ph_var, "温度 ℃", self.temp_var, "电压 V", self.voltage_var)
-        self._label_row(telemetry, 1, "PWM1 %", self.pwm_var, "蠕动泵 %", self.pump_var, "连接", self.status_var)
+        self._label_row(telemetry, 1, "PWM1 %", self.pwm_display_var, "蠕动泵 %", self.pump_display_var, "连接", self.status_var)
 
         slider = ttk.LabelFrame(root, text="丝杆滑台", padding=10)
         slider.pack(fill=tk.X, pady=8)
 
         self._label_row(slider, 0, "当前位置", self.slider_pos_var, "目标位置", self.slider_target_var, "剩余步数", self.slider_distance_var)
-        self._label_row(slider, 1, "已使能", self.slider_enabled_var, "运动中", self.slider_moving_var, "速度", self.slider_speed_var)
+        self._label_row(slider, 1, "已使能", self.slider_enabled_var, "运动中", self.slider_moving_var, "当前速度", self.slider_speed_display_var)
 
         controls = ttk.Frame(slider)
         controls.grid(row=2, column=0, columnspan=6, sticky="ew", pady=8)
         ttk.Label(controls, text="速度 steps/s").grid(row=0, column=0, padx=4)
-        ttk.Entry(controls, textvariable=self.slider_speed_var, width=10).grid(row=0, column=1, padx=4)
+        ttk.Entry(controls, textvariable=self.slider_speed_set_var, width=10).grid(row=0, column=1, padx=4)
         ttk.Button(controls, text="设置速度", command=self.set_slider_speed).grid(row=0, column=2, padx=4)
         ttk.Label(controls, text="加速度").grid(row=0, column=3, padx=4)
         ttk.Entry(controls, textvariable=self.slider_accel_var, width=10).grid(row=0, column=4, padx=4)
@@ -261,10 +262,10 @@ class TitratorApp(tk.Tk):
         pump_frame = ttk.LabelFrame(root, text="PWM / 蠕动泵", padding=10)
         pump_frame.pack(fill=tk.X, pady=8)
         ttk.Label(pump_frame, text="PWM1 %").grid(row=0, column=0, padx=4)
-        ttk.Entry(pump_frame, textvariable=self.pwm_var, width=10).grid(row=0, column=1, padx=4)
+        ttk.Entry(pump_frame, textvariable=self.pwm_set_var, width=10).grid(row=0, column=1, padx=4)
         ttk.Button(pump_frame, text="设置 PWM1", command=self.set_pwm1).grid(row=0, column=2, padx=4)
         ttk.Label(pump_frame, text="蠕动泵 %").grid(row=0, column=3, padx=4)
-        ttk.Entry(pump_frame, textvariable=self.pump_var, width=10).grid(row=0, column=4, padx=4)
+        ttk.Entry(pump_frame, textvariable=self.pump_set_var, width=10).grid(row=0, column=4, padx=4)
         ttk.Button(pump_frame, text="设置蠕动泵", command=self.set_pump).grid(row=0, column=5, padx=4)
         ttk.Button(pump_frame, text="停止蠕动泵", command=self.pump_stop).grid(row=0, column=6, padx=4)
 
@@ -341,7 +342,7 @@ class TitratorApp(tk.Tk):
             messagebox.showerror("串口发送失败", str(exc))
 
     def set_slider_speed(self):
-        self.send_cmd("slider_speed", speed=float(self.slider_speed_var.get()))
+        self.send_cmd("slider_speed", speed=float(self.slider_speed_set_var.get()))
 
     def set_slider_accel(self):
         self.send_cmd("slider_accel", accel=float(self.slider_accel_var.get()))
@@ -371,10 +372,10 @@ class TitratorApp(tk.Tk):
         self.send_cmd("emergency_stop")
 
     def set_pwm1(self):
-        self.send_cmd("set_pwm1", percent=float(self.pwm_var.get()))
+        self.send_cmd("set_pwm1", percent=float(self.pwm_set_var.get()))
 
     def set_pump(self):
-        self.send_cmd("set_pump", percent=float(self.pump_var.get()))
+        self.send_cmd("set_pump", percent=float(self.pump_set_var.get()))
 
     def pump_stop(self):
         self.send_cmd("pump_stop")
@@ -438,8 +439,8 @@ class TitratorApp(tk.Tk):
         self.ph_var.set(self._fmt(msg.get("ph"), 3))
         self.temp_var.set(self._fmt(msg.get("temperature_c"), 2))
         self.voltage_var.set(self._fmt(msg.get("voltage"), 6))
-        self.pwm_var.set(self._fmt(msg.get("pwm1_percent"), 1))
-        self.pump_var.set(self._fmt(msg.get("pump_percent"), 1))
+        self.pwm_display_var.set(self._fmt(msg.get("pwm1_percent"), 1))
+        self.pump_display_var.set(self._fmt(msg.get("pump_percent"), 1))
         ip = msg.get("ip")
         if ip:
             self.esp32_ip_var.set(str(ip))
@@ -454,7 +455,7 @@ class TitratorApp(tk.Tk):
         self.slider_enabled_var.set(str(slider.get("enabled", "--")))
         self.slider_moving_var.set(str(slider.get("moving", "--")))
         if slider.get("speed") is not None:
-            self.slider_speed_var.set(self._fmt(slider.get("speed"), 1))
+            self.slider_speed_display_var.set(self._fmt(slider.get("speed"), 1))
 
     @staticmethod
     def _fmt(value, decimals):

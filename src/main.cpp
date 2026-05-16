@@ -191,9 +191,16 @@ static void sendTelemetryJson() {
   sendJson(doc);
 }
 
+static void runSlider() {
+  if (gSliderEnabled) {
+    sliderStepper.run();
+  }
+}
+
 static void updateSerialTelemetry() {
   const uint32_t now = millis();
-  if (now - gLastTelemetryMs < TELEMETRY_INTERVAL_MS) {
+  const uint32_t interval = gSliderMoveActive || gSliderStopActive ? 2500 : TELEMETRY_INTERVAL_MS;
+  if (now - gLastTelemetryMs < interval) {
     return;
   }
   gLastTelemetryMs = now;
@@ -611,16 +618,21 @@ void setup() {
 }
 
 void loop() {
+  runSlider();
   processSerialInput();
+  runSlider();
   ArduinoOTA.handle();
+  runSlider();
   updateWifi();
-
-  if (gSliderEnabled) {
-    sliderStepper.run();
-  }
+  runSlider();
   updateSliderCompletion();
+  runSlider();
 
-  updatePhReading();
-  updateTemperatureReading();
+  if (!gSliderMoveActive && !gSliderStopActive) {
+    updatePhReading();
+    runSlider();
+    updateTemperatureReading();
+    runSlider();
+  }
   updateSerialTelemetry();
 }

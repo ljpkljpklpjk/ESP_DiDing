@@ -21,14 +21,12 @@ def build_command(project_dir: Path, host: str, password: str) -> list[str]:
         "run",
         "-d",
         str(project_dir),
+        "-e",
+        "esp32s3box_ota",
         "-t",
         "upload",
-        "--upload-protocol",
-        "espota",
         "--upload-port",
         host,
-        "--upload-flags",
-        f"--auth={password}",
     ]
 
 

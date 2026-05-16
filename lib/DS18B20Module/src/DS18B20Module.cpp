@@ -24,8 +24,7 @@ bool DS18B20Module::begin() {
   const uint8_t count = impl_->dallas.getDeviceCount();
   ready_ = (count > 0);
 
-  // Keep call simple in main loop; conversion is handled in this module.
-  impl_->dallas.setWaitForConversion(true);
+  impl_->dallas.setWaitForConversion(false);
   return ready_;
 }
 

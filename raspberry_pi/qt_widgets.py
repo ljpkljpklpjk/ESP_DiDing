@@ -89,8 +89,17 @@ def make_log():
     return log
 
 
-def append_log(log, text):
+def append_log(log, text, max_lines=500):
     log.append(str(text))
+    document = log.document()
+    extra = document.blockCount() - max_lines
+    if extra > 0:
+        cursor = log.textCursor()
+        cursor.movePosition(cursor.Start)
+        for _ in range(extra):
+            cursor.select(cursor.BlockUnderCursor)
+            cursor.removeSelectedText()
+            cursor.deleteChar()
     log.verticalScrollBar().setValue(log.verticalScrollBar().maximum())
 
 

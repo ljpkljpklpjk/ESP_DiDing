@@ -1,8 +1,8 @@
 {
-  "version": "v2026.05.18.1",
+  "version": "v2026.05.18.2",
   "environment": "esp32s3box_ota",
   "filename": "firmware.bin",
-  "size_bytes": 804688,
-  "built_at": "2026-05-18T11:41:10+08:00",
-  "description": "模块化重构并加入 AS7341 与 MLX90640 采样"
+  "size_bytes": 806320,
+  "built_at": "2026-05-18T16:11:59+08:00",
+  "description": "ESP32 FreeRTOS 调度与上位机非阻塞刷新优化固件"
 }

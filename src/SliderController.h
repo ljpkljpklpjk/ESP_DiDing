@@ -3,6 +3,8 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <AccelStepper.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 
 struct SliderEvent {
   bool active = false;
@@ -18,7 +20,7 @@ class SliderController {
   void run();
   bool busy();
   void setEnabled(bool enabled);
-  bool enabled() const { return enabled_; }
+  bool enabled();
   void setSpeed(float speed);
   bool speedInRange(float speed) const;
   void setAcceleration(float accel);
@@ -32,13 +34,16 @@ class SliderController {
   SliderEvent updateCompletion();
   void addTelemetry(JsonDocument &doc);
 
-  float speed() const { return speed_; }
-  long currentPosition() { return stepper_.currentPosition(); }
-  long targetPosition() { return stepper_.targetPosition(); }
-  long distanceToGo() { return stepper_.distanceToGo(); }
+  float speed();
+  long currentPosition();
+  long targetPosition();
+  long distanceToGo();
 
  private:
   void clearMove(bool interrupted, SliderEvent *event = nullptr);
+  void ensureMutex();
+  void lock();
+  void unlock();
 
   AccelStepper stepper_;
   bool enabled_ = false;
@@ -47,4 +52,5 @@ class SliderController {
   long moveCommandId_ = -1;
   bool stopActive_ = false;
   long stopCommandId_ = -1;
+  SemaphoreHandle_t mutex_ = nullptr;
 };

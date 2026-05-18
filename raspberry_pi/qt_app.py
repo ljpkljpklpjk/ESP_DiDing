@@ -25,6 +25,7 @@ class TitratorQtApp(QMainWindow):
         self.ota_running = False
         self.ota_start_time = 0.0
         self.ota_last_output_time = 0.0
+        self.pending_telemetry = None
 
         self.setWindowTitle("ESP32 自动滴定仪上位机")
         self.resize(1180, 760)
@@ -62,7 +63,11 @@ class TitratorQtApp(QMainWindow):
 
         self.serial_timer = QTimer(self)
         self.serial_timer.timeout.connect(self.poll_serial)
-        self.serial_timer.start(100)
+        self.serial_timer.start(50)
+
+        self.telemetry_timer = QTimer(self)
+        self.telemetry_timer.timeout.connect(self.flush_telemetry)
+        self.telemetry_timer.start(200)
 
         self.ota_heartbeat_timer = QTimer(self)
         self.ota_heartbeat_timer.timeout.connect(self.update_ota_heartbeat)
@@ -178,8 +183,8 @@ class TitratorQtApp(QMainWindow):
         self.update_page.set_progress("准备上传预编译固件...")
         self.update_page.set_ota_running(True)
         self.update_page.log.clear()
-        append_log(self.update_page.log, self.system.firmware_version_text())
-        append_log(self.update_page.log, "执行命令: " + " ".join(cmd))
+        append_log(self.update_page.log, self.system.firmware_version_text(), max_lines=800)
+        append_log(self.update_page.log, "执行命令: " + " ".join(cmd), max_lines=800)
         self.ota_heartbeat_timer.start(1000)
 
         task = OtaTask(cmd, self.system.project_dir)
@@ -192,7 +197,7 @@ class TitratorQtApp(QMainWindow):
         progress = self.ota_progress_text(line)
         self.update_page.set_progress(progress)
         self.update_page.set_status(line)
-        append_log(self.update_page.log, line)
+        append_log(self.update_page.log, line, max_lines=800)
 
     def update_ota_heartbeat(self):
         if not self.ota_running:
@@ -209,11 +214,11 @@ class TitratorQtApp(QMainWindow):
         if code == 0:
             self.update_page.set_progress("OTA 完成，等待 ESP32 重启并恢复遥测")
             self.update_page.set_status("ESP32 OTA 更新完成")
-            append_log(self.update_page.log, "OTA 任务完成")
+            append_log(self.update_page.log, "OTA 任务完成", max_lines=800)
         else:
             self.update_page.set_progress(f"OTA 失败: {last_line or '无输出'}")
             self.update_page.set_status("ESP32 OTA 更新失败")
-            append_log(self.update_page.log, f"OTA 任务失败: {last_line or '无输出'}")
+            append_log(self.update_page.log, f"OTA 任务失败: {last_line or '无输出'}", max_lines=800)
 
     @staticmethod
     def ota_progress_text(line):
@@ -239,16 +244,22 @@ class TitratorQtApp(QMainWindow):
         return line
 
     def poll_serial(self):
-        while True:
+        deadline = time.monotonic() + 0.02
+        processed = 0
+        while processed < 20 and time.monotonic() < deadline:
             try:
                 msg = self.rx_queue.get_nowait()
             except queue.Empty:
                 break
             self.handle_message(msg)
+            processed += 1
 
     def handle_message(self, msg):
-        self.log_serial("RX " + json.dumps(msg, ensure_ascii=False))
         msg_type = msg.get("type")
+        if msg_type == "telemetry":
+            self.pending_telemetry = msg
+            return
+        self.log_serial("RX " + json.dumps(msg, ensure_ascii=False))
         if msg_type == "telemetry":
             self.update_telemetry(msg)
         elif msg_type == "boot":
@@ -270,6 +281,14 @@ class TitratorQtApp(QMainWindow):
             self.ip_label.setText(f"ESP32 IP: {ip}")
             self.update_page.set_esp32_ip(ip)
         self.control_page.update_telemetry(msg)
+
+    def flush_telemetry(self):
+        if not self.pending_telemetry:
+            return
+        msg = self.pending_telemetry
+        self.pending_telemetry = None
+        self.log_serial("RX " + json.dumps(msg, ensure_ascii=False))
+        self.update_telemetry(msg)
 
     def log_serial(self, text):
         append_log(self.control_page.log, text)

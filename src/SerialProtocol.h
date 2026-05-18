@@ -2,6 +2,8 @@
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 
 class SerialProtocol {
  public:
@@ -18,7 +20,9 @@ class SerialProtocol {
 
  private:
   void handleLine(const char *line, LineHandler handler, void *context);
+  void ensureTxMutex();
 
   char rxBuf_[320];
   size_t rxLen_ = 0;
+  SemaphoreHandle_t txMutex_ = nullptr;
 };

@@ -4,6 +4,12 @@
 
 SerialProtocol::SerialProtocol() = default;
 
+void SerialProtocol::ensureTxMutex() {
+  if (!txMutex_) {
+    txMutex_ = xSemaphoreCreateMutex();
+  }
+}
+
 void SerialProtocol::processInput(LineHandler handler, void *context) {
   size_t processed = 0;
   while (Serial.available() > 0 && processed < AppConfig::SERIAL_BYTES_PER_LOOP) {
@@ -30,8 +36,15 @@ void SerialProtocol::processInput(LineHandler handler, void *context) {
 }
 
 void SerialProtocol::sendJson(JsonDocument &doc) {
+  ensureTxMutex();
+  if (txMutex_) {
+    xSemaphoreTake(txMutex_, portMAX_DELAY);
+  }
   serializeJson(doc, Serial);
   Serial.println();
+  if (txMutex_) {
+    xSemaphoreGive(txMutex_);
+  }
 }
 
 void SerialProtocol::sendAck(long id, float pwm1Percent, float pumpPercent) {

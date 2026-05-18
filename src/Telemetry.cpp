@@ -6,7 +6,7 @@
 
 void buildTelemetry(JsonDocument &doc, const SensorSampler &sensors,
                     const OpticalThermalSampler &opticalThermal,
-                    const OutputController &outputs,
+                    OutputController &outputs,
                     SliderController &slider,
                     const NetworkOtaManager &network) {
   doc["type"] = "telemetry";

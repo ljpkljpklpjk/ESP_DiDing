@@ -26,38 +26,11 @@ void TitratorApp::begin() {
   boot["optical_thermal_ok"] = opticalReady;
   slider_.addTelemetry(boot);
   serial_.sendJson(boot);
+  startTasks();
 }
 
 void TitratorApp::loop() {
-  slider_.run();
-
-  if (slider_.busy()) {
-    serial_.processInput(handleSerialDocument, this);
-    slider_.run();
-    network_.updateOta(true);
-    slider_.run();
-    network_.updateWifi();
-    slider_.run();
-    updateSliderCompletion();
-    slider_.run();
-    return;
-  }
-
-  serial_.processInput(handleSerialDocument, this);
-  slider_.run();
-  network_.updateOta(false);
-  slider_.run();
-  network_.updateWifi();
-  slider_.run();
-  updateSliderCompletion();
-  slider_.run();
-  sensors_.updatePh();
-  slider_.run();
-  sensors_.updateTemperature();
-  slider_.run();
-  opticalThermal_.update();
-  slider_.run();
-  updateSerialTelemetry();
+  vTaskDelay(pdMS_TO_TICKS(1000));
 }
 
 void TitratorApp::handleSerialDocument(JsonDocument &doc, void *context) {
@@ -70,6 +43,86 @@ void TitratorApp::emergencyStopCallback(void *context) {
 
 void TitratorApp::otaStatusCallback(const char *event, int code, void *context) {
   static_cast<TitratorApp *>(context)->sendOtaStatus(event, code);
+}
+
+void TitratorApp::sliderTaskEntry(void *context) {
+  static_cast<TitratorApp *>(context)->sliderTask();
+}
+
+void TitratorApp::serialTaskEntry(void *context) {
+  static_cast<TitratorApp *>(context)->serialTask();
+}
+
+void TitratorApp::networkTaskEntry(void *context) {
+  static_cast<TitratorApp *>(context)->networkTask();
+}
+
+void TitratorApp::sensorTaskEntry(void *context) {
+  static_cast<TitratorApp *>(context)->sensorTask();
+}
+
+void TitratorApp::telemetryTaskEntry(void *context) {
+  static_cast<TitratorApp *>(context)->telemetryTask();
+}
+
+void TitratorApp::startTasks() {
+  if (tasksStarted_) {
+    return;
+  }
+  tasksStarted_ = true;
+  xTaskCreatePinnedToCore(sliderTaskEntry, "slider", 4096, this, 5, nullptr, 1);
+  xTaskCreatePinnedToCore(serialTaskEntry, "serial", 4096, this, 4, nullptr, 1);
+  xTaskCreatePinnedToCore(networkTaskEntry, "network", 4096, this, 2, nullptr, 0);
+  xTaskCreatePinnedToCore(sensorTaskEntry, "sensors", 8192, this, 1, nullptr, 0);
+  xTaskCreatePinnedToCore(telemetryTaskEntry, "telemetry", 6144, this, 1, nullptr, 0);
+}
+
+void TitratorApp::sliderTask() {
+  TickType_t lastWake = xTaskGetTickCount();
+  while (true) {
+    slider_.run();
+    updateSliderCompletion();
+    vTaskDelayUntil(&lastWake, pdMS_TO_TICKS(1));
+  }
+}
+
+void TitratorApp::serialTask() {
+  while (true) {
+    serial_.processInput(handleSerialDocument, this);
+    vTaskDelay(pdMS_TO_TICKS(2));
+  }
+}
+
+void TitratorApp::networkTask() {
+  while (true) {
+    const bool busy = slider_.busy();
+    network_.updateOta(busy);
+    network_.updateWifi();
+    vTaskDelay(pdMS_TO_TICKS(busy ? 20 : 10));
+  }
+}
+
+void TitratorApp::sensorTask() {
+  while (true) {
+    if (!slider_.busy()) {
+      sensors_.updatePh();
+      sensors_.updateTemperature();
+      opticalThermal_.update();
+    }
+    vTaskDelay(pdMS_TO_TICKS(slider_.busy() ? 50 : 10));
+  }
+}
+
+void TitratorApp::telemetryTask() {
+  while (true) {
+    const uint32_t now = millis();
+    const uint32_t interval = slider_.busy() ? 2000 : AppConfig::TELEMETRY_INTERVAL_MS;
+    if (now - lastTelemetryMs_ >= interval) {
+      lastTelemetryMs_ = now;
+      sendTelemetry();
+    }
+    vTaskDelay(pdMS_TO_TICKS(100));
+  }
 }
 
 void TitratorApp::handleCommand(JsonDocument &doc) {
@@ -259,18 +312,6 @@ void TitratorApp::sendOtaStatus(const char *event, int code) {
   }
   doc["ip"] = network_.ipText();
   serial_.sendJson(doc);
-}
-
-void TitratorApp::updateSerialTelemetry() {
-  if (slider_.busy()) {
-    return;
-  }
-  const uint32_t now = millis();
-  if (now - lastTelemetryMs_ < AppConfig::TELEMETRY_INTERVAL_MS) {
-    return;
-  }
-  lastTelemetryMs_ = now;
-  sendTelemetry();
 }
 
 void TitratorApp::updateSliderCompletion() {

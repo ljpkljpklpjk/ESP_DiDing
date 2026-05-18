@@ -2,6 +2,8 @@
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 #include "NetworkOtaManager.h"
 #include "OpticalThermalSampler.h"
@@ -19,13 +21,23 @@ class TitratorApp {
   static void handleSerialDocument(JsonDocument &doc, void *context);
   static void emergencyStopCallback(void *context);
   static void otaStatusCallback(const char *event, int code, void *context);
+  static void sliderTaskEntry(void *context);
+  static void serialTaskEntry(void *context);
+  static void networkTaskEntry(void *context);
+  static void sensorTaskEntry(void *context);
+  static void telemetryTaskEntry(void *context);
 
+  void startTasks();
+  void sliderTask();
+  void serialTask();
+  void networkTask();
+  void sensorTask();
+  void telemetryTask();
   void handleCommand(JsonDocument &doc);
   void emergencyStop();
   void sendAck(long id = -1);
   void sendTelemetry();
   void sendOtaStatus(const char *event, int code = -1);
-  void updateSerialTelemetry();
   void updateSliderCompletion();
   bool jsonHasNumber(JsonDocument &doc, const char *key);
   bool readFloatField(JsonDocument &doc, const char *key, float &out,
@@ -38,4 +50,5 @@ class TitratorApp {
   NetworkOtaManager network_;
   SerialProtocol serial_;
   uint32_t lastTelemetryMs_ = 0;
+  bool tasksStarted_ = false;
 };

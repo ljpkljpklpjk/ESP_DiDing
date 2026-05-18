@@ -1,8 +1,8 @@
 {
-  "version": "v2026.05.16.6",
+  "version": "v2026.05.18.1",
   "environment": "esp32s3box_ota",
   "filename": "firmware.bin",
-  "size_bytes": 764096,
-  "built_at": "2026-05-16T17:05:15+08:00",
-  "description": "修复预编译固件 OTA 块确认处理"
+  "size_bytes": 804688,
+  "built_at": "2026-05-18T11:41:10+08:00",
+  "description": "模块化重构并加入 AS7341 与 MLX90640 采样"
 }

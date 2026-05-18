@@ -6,8 +6,8 @@
 
 ```bash
 sudo apt update
-sudo apt install -y python3-tk python3-pip
-pip3 install pyserial
+sudo apt install -y python3-pip
+pip3 install pyserial PySide6
 ```
 
 ## 建立树莓派系统工程路径
@@ -24,7 +24,7 @@ pip3 install pyserial
 cd /home/pi
 git clone -b codex/new_feature https://gitee.com/bidi2004/diding.git diding
 cd /home/pi/diding
-pip3 install pyserial
+pip3 install pyserial PySide6
 ```
 
 如果已经从 GitHub 或其他地址克隆过，也可以在项目目录内改成 Gitee 更新源：
@@ -40,9 +40,9 @@ git branch --set-upstream-to=gitee/codex/new_feature codex/new_feature
 
 ## 运行
 
-上位机现在是树莓派屏幕上的一体化界面，包含：
+上位机现在是树莓派屏幕上的 PySide6 一体化界面，包含：
 
-- 滴定控制：pH、温度、电压、PWM、蠕动泵、丝杆滑台。
+- 滴定控制：pH、温度、电压、PWM、蠕动泵、丝杆滑台、AS7341、MLX90640。
 - 网络设置：查看树莓派 WiFi 状态、打开/关闭 WiFi、输入 SSID 和密码连接 WiFi。
 - 系统更新：检查项目更新、更新上位机代码、通过 OTA 更新 ESP32 下位机固件。
 
@@ -57,6 +57,18 @@ python3 raspberry_pi/titrator_gui.py --port /dev/ttyACM0 --project-dir /home/pi/
 ```bash
 python3 raspberry_pi/titrator_gui.py --port /dev/ttyUSB0 --project-dir /home/pi/diding
 ```
+
+## PySide6 界面说明
+
+`raspberry_pi/titrator_gui.py` 现在默认启动 PySide6 Qt 界面，不再使用 Tkinter 作为主界面。Qt 界面使用大字号状态卡片、触摸友好的按钮、实时日志窗口和后台线程任务，避免 OTA、Gitee 更新、WiFi 操作阻塞界面。
+
+如果安装 PySide6 后仍提示找不到模块，先检查当前 Python 环境：
+
+```bash
+python3 -c "from PySide6.QtWidgets import QApplication; print('PySide6 ok')"
+```
+
+如果这条命令失败，需要在启动 GUI 的同一个 Python 环境里重新安装 PySide6。
 
 ## 系统功能说明
 

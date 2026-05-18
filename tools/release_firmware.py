@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 DEFAULT_ENV = "esp32s3box_ota"
-DEFAULT_VERSION = "v2026.05.16.5"
+DEFAULT_VERSION = "v2026.05.18.1"
 
 
 def default_project_dir() -> Path:

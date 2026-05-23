@@ -10,6 +10,44 @@ sudo apt install -y python3-tk python3-pip
 pip3 install pyserial
 ```
 
+## Ubuntu 工控机部署
+
+Ubuntu 工控机可以直接运行同一个上位机脚本，不需要树莓派专用系统。推荐使用系统自带的 `python3`，并安装 Tkinter、串口和网络管理依赖：
+
+```bash
+sudo apt update
+sudo apt install -y python3-tk python3-pip python3-serial git network-manager
+python3 -m pip install --user pyserial
+```
+
+如果启动时停在类似下面的 Qt 报错：
+
+```text
+qt.qpa.plugin: From 6.5.0, xcb-cursor0 or libxcb-cursor0 is needed to load the Qt xcb platform plugin.
+qt.qpa.plugin: Could not load the Qt platform plugin "xcb" in "" even though it was found.
+```
+
+这通常不是 `titrator_gui.py` 本身的问题；当前上位机界面使用的是 Tkinter，不依赖 PyQt/PySide。该错误多见于 Ubuntu 图形环境或某个 Qt 版 Python/终端组件缺少 xcb 运行库。先补齐这些系统包：
+
+```bash
+sudo apt install -y libxcb-cursor0 libxcb-xinerama0 libxkbcommon-x11-0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0
+```
+
+然后确认当前终端在图形桌面内运行：
+
+```bash
+echo $DISPLAY
+python3 - <<'PY'
+import tkinter as tk
+root = tk.Tk()
+root.title("Tkinter test")
+root.after(1000, root.destroy)
+root.mainloop()
+PY
+```
+
+如果 `echo $DISPLAY` 没有输出，说明当前不是图形会话；请在 Ubuntu 桌面终端里运行，或先配置 X11/远程桌面显示。不要优先用手动安装的 `python3.12` 或 conda 环境，除非已经给同一个 Python 安装了匹配的 Tkinter 和 pyserial。
+
 ## 建立树莓派系统工程路径
 
 树莓派端推荐固定把完整工程放在：

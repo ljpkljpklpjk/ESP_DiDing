@@ -683,6 +683,44 @@ pip3 install pyserial
 
 如果系统默认没有启用 NetworkManager，需要根据树莓派系统版本启用 NetworkManager。
 
+### Ubuntu 工控机替代树莓派
+
+如果把树莓派换成基于 Ubuntu 的工控机，可以继续运行同一个 `raspberry_pi/titrator_gui.py`。推荐在 Ubuntu 桌面终端中使用系统自带 `python3`：
+
+```bash
+sudo apt update
+sudo apt install -y python3-tk python3-pip python3-serial git network-manager
+python3 -m pip install --user pyserial
+```
+
+若出现如下 Qt 平台插件错误：
+
+```text
+qt.qpa.plugin: From 6.5.0, xcb-cursor0 or libxcb-cursor0 is needed to load the Qt xcb platform plugin.
+qt.qpa.plugin: Could not load the Qt platform plugin "xcb" in "" even though it was found.
+```
+
+先安装 Ubuntu 的 xcb 运行库：
+
+```bash
+sudo apt install -y libxcb-cursor0 libxcb-xinerama0 libxkbcommon-x11-0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0
+```
+
+当前上位机脚本使用 Tkinter，并不依赖 PyQt/PySide；这个报错通常来自 Ubuntu 图形环境、Qt 版终端组件或手动安装的 Python 环境缺库。建议同时确认：
+
+```bash
+echo $DISPLAY
+python3 - <<'PY'
+import tkinter as tk
+root = tk.Tk()
+root.title("Tkinter test")
+root.after(1000, root.destroy)
+root.mainloop()
+PY
+```
+
+如果 `$DISPLAY` 为空，请在 Ubuntu 图形桌面终端里运行，或先配置 X11/远程桌面显示。若使用 `python3.12`、conda 或其他手动安装 Python，需要确保同一个 Python 环境中存在 Tkinter 和 pyserial；现场部署优先建议使用系统 `python3`。
+
 ### 如果已经从 GitHub 克隆过
 
 可以在项目目录添加或修正 Gitee 远程源：

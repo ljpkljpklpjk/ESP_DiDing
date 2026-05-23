@@ -6,7 +6,7 @@ class NetworkPage:
         self.app = app
         self.root, layout = page_widget()
 
-        status_panel, status_layout = make_panel("树莓派 WiFi")
+        status_panel, status_layout = make_panel("SH800 WiFi")
         self.status = ValueCard("当前状态", "未刷新")
         status_layout.addWidget(self.status)
         layout.addWidget(status_panel)

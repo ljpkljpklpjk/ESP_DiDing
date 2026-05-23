@@ -1,11 +1,13 @@
 import json
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 
 DEFAULT_OTA_PASSWORD = "lab80700"
 DEFAULT_PROJECT_DIR = Path(__file__).resolve().parents[1]
+DEFAULT_CONTROLLER_NAME = "有人 SH800"
 FIRMWARE_RELATIVE_PATH = Path("firmware/esp32s3box_ota/firmware.bin")
 FIRMWARE_VERSION_RELATIVE_PATH = Path("firmware/esp32s3box_ota/version.json")
 GITEE_REPO_URL = "https://gitee.com/bidi2004/diding.git"
@@ -13,7 +15,7 @@ GITEE_BRANCH = "codex/new_feature"
 GITEE_REMOTE = "gitee"
 
 
-class PiSystemManager:
+class LinuxSystemManager:
     def __init__(self, project_dir: Path):
         self.project_dir = project_dir
 
@@ -186,7 +188,7 @@ class PiSystemManager:
 
     def ota_command(self, host: str, password: str):
         return [
-            "python3",
+            sys.executable,
             str(self.project_dir / "raspberry_pi" / "ota_upload_bin.py"),
             "--host",
             host,
@@ -205,5 +207,5 @@ class PiSystemManager:
 
     def _require_nmcli(self, cmd):
         if not shutil.which("nmcli"):
-            return 1, "未找到 nmcli，请在树莓派上启用/安装 NetworkManager"
+            return 1, "未找到 nmcli，请在 Ubuntu 20.04 上安装并启用 NetworkManager"
         return self._run(cmd)

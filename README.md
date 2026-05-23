@@ -1,14 +1,14 @@
-# ESP32-S3 自动滴定仪下位机与树莓派上位机工程
+# ESP32-S3 自动滴定仪下位机与 SH800 上位机工程
 
 ## 版本信息
 
 - 版本号：v2026.05.18.2
 - 提交时间：2026-05-18 16:11:09 +0800
-- 更新内容：ESP32 下位机改为 FreeRTOS 分优先级调度，强化串口与滑台/输出共享状态保护，优化 PySide6 上位机遥测刷新节流和日志裁剪，并重新生成预编译 OTA 固件。
+- 更新内容：ESP32 下位机改为 FreeRTOS 分优先级调度，强化串口与滑台/输出共享状态保护，SH800 上位机使用 Python 3.12 + PySide6 / Qt6 图形界面。
 
 ## 项目概述
 
-本仓库是一个基于 ESP32-S3 和树莓派 3B+ 的自动滴定仪测试工程。
+本仓库是一个基于 ESP32-S3 和有人 SH800（RK3568，Ubuntu 20.04） 的自动滴定仪测试工程。
 
 整体设计分为两部分：
 
@@ -16,18 +16,18 @@
    - 负责直接连接和控制传感器、执行器。
    - 负责采集 pH、电压、温度等数据。
    - 负责控制 PWM 输出、蠕动泵、丝杆滑台。
-   - 通过串口 JSON Lines 与树莓派通信。
+   - 通过串口 JSON Lines 与SH800通信。
    - 支持 WiFi 与 ArduinoOTA 远程固件更新。
 
-2. **树莓派上位机**
-   - 运行本仓库内的 Tkinter 图形界面。
+2. **SH800 上位机**
+   - 运行本仓库内的 PySide6 / Qt6 图形界面。
    - 通过 USB 串口与 ESP32-S3 通信。
-   - 在树莓派本地屏幕上显示滴定仪状态。
+   - 在SH800本地屏幕上显示滴定仪状态。
    - 提供 PWM、蠕动泵、丝杆滑台控制按钮。
    - 提供 WiFi 打开/关闭、连接 WiFi、查看 IP 功能。
    - 提供从 Gitee 检查更新、拉取更新、通过 OTA 更新 ESP32 固件的功能。
 
-当前通信方式为 **串口 JSON Lines**：树莓派上位机按行发送 JSON 控制指令，ESP32-S3 按行回传遥测、确认、完成和错误信息。
+当前通信方式为 **串口 JSON Lines**：SH800 上位机按行发送 JSON 控制指令，ESP32-S3 按行回传遥测、确认、完成和错误信息。
 
 ## 当前已支持功能
 
@@ -50,14 +50,14 @@
 
 ### 上位机功能
 
-- 树莓派本地 PySide6 图形界面。
+- SH800 本地 PySide6 / Qt6 图形界面。
 - pH、温度、电压、PWM、蠕动泵、滑台状态实时显示。
 - AS7341 强度、变化率和 MLX90640 平均温度显示。
 - PWM1 和蠕动泵百分比设置。
 - 丝杆滑台速度、加速度、移动距离、移动时间设置。
 - 丝杆滑台使能、关闭使能、停止、立即停止、清零、急停。
-- 树莓派 WiFi 状态显示。
-- 树莓派 WiFi 打开、关闭、连接其他 WiFi。
+- SH800 WiFi 状态显示。
+- SH800 WiFi 打开、关闭、连接其他 WiFi。
 - Gitee 更新源检查。
 - 从 Gitee 拉取最新上位机代码和预编译固件。
 - 直接上传仓库内预编译 `firmware.bin` 到 ESP32。
@@ -70,17 +70,17 @@
 1. 管理者在 Windows 电脑上维护本仓库代码。
 2. 管理者在 Windows 电脑上编译 ESP32 固件。
 3. 管理者把生成好的预编译固件 `firmware/esp32s3box_ota/firmware.bin` 提交并推送到 Gitee/GitHub。
-4. 树莓派固定从 Gitee 拉取项目更新。
-5. 树莓派本地屏幕运行 `raspberry_pi/titrator_gui.py`。
-6. 用户在树莓派界面点击“从 Gitee 更新代码”。
-7. 用户在树莓派界面点击“更新 ESP32 固件 OTA”。
-8. 树莓派直接把仓库里的预编译固件上传给 ESP32，不在树莓派上编译。
+4. SH800固定从 Gitee 拉取项目更新。
+5. SH800本地屏幕运行 `raspberry_pi/titrator_gui.py`。
+6. 用户在SH800界面点击“从 Gitee 更新代码”。
+7. 用户在SH800界面点击“更新 ESP32 固件 OTA”。
+8. SH800直接把仓库里的预编译固件上传给 ESP32，不在SH800上编译。
 
 这样做的好处是：
 
-- 树莓派不需要安装完整 PlatformIO 编译链。
-- 树莓派不需要访问 GitHub，优先使用 Gitee。
-- ESP32 不需要暴露到公网，只需要和树莓派在同一实验室局域网。
+- SH800不需要安装完整 PlatformIO 编译链。
+- SH800不需要访问 GitHub，优先使用 Gitee。
+- ESP32 不需要暴露到公网，只需要和SH800在同一实验室局域网。
 - 现场更新流程更稳定，适合触摸屏一体化操作。
 
 ## 仓库目录说明
@@ -96,10 +96,10 @@
 ├── src/
 │   └── main.cpp                     # ESP32-S3 下位机主程序
 ├── raspberry_pi/
-│   ├── titrator_gui.py              # 树莓派 Tkinter 一体化上位机界面
-│   ├── ota_update.py                # 树莓派命令行 OTA 入口
+│   ├── titrator_gui.py              # SH800 PySide6 / Qt6 一体化上位机界面
+│   ├── ota_update.py                # SH800命令行 OTA 入口
 │   ├── ota_upload_bin.py            # 不依赖 PlatformIO 的 Python OTA 上传器
-│   └── README.md                    # 树莓派端说明
+│   └── README.md                    # SH800端说明
 ├── tools/
 │   └── release_firmware.py          # 管理者电脑生成预编译固件的脚本
 ├── firmware/
@@ -304,8 +304,8 @@ ESP32 主循环中最需要高频调用的是丝杆滑台的 `AccelStepper::run(
 ### 通信方向
 
 ```text
-树莓派 / 串口调试工具  ->  ESP32：控制命令
-ESP32                 ->  树莓派 / 串口调试工具：遥测、确认、完成、错误
+SH800 / 串口调试工具  ->  ESP32：控制命令
+ESP32                 ->  SH800 / 串口调试工具：遥测、确认、完成、错误
 ```
 
 ### 命令 id 说明
@@ -570,7 +570,7 @@ C:/Users/MI/.platformio/penv/Scripts/platformio.exe run -d D:/galgame/ESP_DiDing
 
 ## 预编译固件发布流程
 
-树莓派现场不推荐编译 ESP32 固件。推荐由管理者电脑生成预编译固件并提交到仓库。
+SH800现场不推荐编译 ESP32 固件。推荐由管理者电脑生成预编译固件并提交到仓库。
 
 ### 一键生成发布固件
 
@@ -612,7 +612,7 @@ firmware/esp32s3box_ota/version.json
 README.md
 ```
 
-如果只修改树莓派上位机 Python 代码，不需要重新生成 `firmware.bin`。
+如果只修改SH800上位机 Python 代码，不需要重新生成 `firmware.bin`。
 
 ## ESP32 OTA 说明
 
@@ -648,12 +648,12 @@ C:/Users/MI/.platformio/penv/Scripts/platformio.exe run -d D:/galgame/ESP_DiDing
 C:/Users/MI/.platformio/penv/Scripts/platformio.exe run -d D:/galgame/ESP_DiDing_codex_new_feature -e esp32s3box_ota -t upload --upload-port esp-diding.local
 ```
 
-### 树莓派直接上传预编译固件
+### SH800直接上传预编译固件
 
-树莓派不需要 PlatformIO。树莓派只需要运行本仓库里的 Python 上传脚本。
+SH800不需要 PlatformIO。SH800只需要运行本仓库里的 Python 上传脚本。
 
 ```bash
-python3 raspberry_pi/ota_update.py --host 192.168.x.x
+python3.12 raspberry_pi/ota_update.py --host 192.168.x.x
 ```
 
 其中 `192.168.x.x` 换成 ESP32 遥测显示的 IP。
@@ -661,7 +661,7 @@ python3 raspberry_pi/ota_update.py --host 192.168.x.x
 如果项目目录不是默认目录，可以指定：
 
 ```bash
-python3 raspberry_pi/ota_update.py --host 192.168.x.x --project-dir /home/pi/diding
+python3.12 raspberry_pi/ota_update.py --host 192.168.x.x --project-dir ~/diding
 ```
 
 底层实际会调用：
@@ -672,55 +672,55 @@ python3 raspberry_pi/ota_upload_bin.py --host 192.168.x.x --file firmware/esp32s
 
 `ota_upload_bin.py` 使用 Python 标准库 socket 实现 ArduinoOTA 上传流程，不依赖 PlatformIO。
 
-## 树莓派上位机部署
+## SH800上位机部署
 
 ### 推荐项目路径
 
-树莓派端推荐固定放在：
+SH800端推荐固定放在：
 
 ```bash
-/home/pi/diding
+~/diding
 ```
 
 ### 第一次克隆项目
 
 ```bash
-cd /home/pi
+cd ~
 git clone -b codex/new_feature https://gitee.com/bidi2004/diding.git diding
-cd /home/pi/diding
+cd ~/diding
 ```
 
 ### 安装系统依赖
 
 ```bash
 sudo apt update
-sudo apt install -y python3-pip git network-manager
-pip3 install pyserial PySide6
+sudo apt install -y git network-manager
+python3.12 -m pip install --user pyserial PySide6
 ```
 
 说明：
 
-- `PySide6` 用于 Qt 图形界面。
+- `PySide6` 用于 Qt6 图形界面。
 - `pyserial` 用于串口通信。
 - `git` 用于从 Gitee 更新项目。
 - `network-manager` 和 `nmcli` 用于界面里的 WiFi 管理。
 
-如果系统默认没有启用 NetworkManager，需要根据树莓派系统版本启用 NetworkManager。
+如果系统默认没有启用 NetworkManager，需要根据SH800系统版本启用 NetworkManager。
 
 ### 如果已经从 GitHub 克隆过
 
 可以在项目目录添加或修正 Gitee 远程源：
 
 ```bash
-cd /home/pi/diding
+cd ~/diding
 git remote add gitee https://gitee.com/bidi2004/diding.git 2>/dev/null || git remote set-url gitee https://gitee.com/bidi2004/diding.git
 git fetch gitee codex/new_feature
 git branch --set-upstream-to=gitee/codex/new_feature codex/new_feature
 ```
 
-## 启动树莓派上位机
+## 启动 SH800 上位机
 
-ESP32 通过 USB 接到树莓派后，串口一般是以下两种之一：
+ESP32 通过 USB 接到 SH800 后，串口一般是以下两种之一：
 
 ```text
 /dev/ttyACM0
@@ -743,33 +743,33 @@ dmesg | tail -n 30
 
 ### 启动 GUI
 
-如果串口是 `/dev/ttyACM0`：
+默认自动选择 `/dev/ttyACM*` 或 `/dev/ttyUSB*`：
 
 ```bash
-cd /home/pi/diding
-python3 raspberry_pi/titrator_gui.py --port /dev/ttyACM0 --project-dir /home/pi/diding
+cd ~/diding
+python3.12 raspberry_pi/titrator_gui.py --project-dir ~/diding
 ```
 
-如果串口是 `/dev/ttyUSB0`：
+如果自动选择不符合现场接线，也可以手动指定：
 
 ```bash
-cd /home/pi/diding
-python3 raspberry_pi/titrator_gui.py --port /dev/ttyUSB0 --project-dir /home/pi/diding
+python3.12 raspberry_pi/titrator_gui.py --port /dev/ttyACM0 --project-dir ~/diding
+python3.12 raspberry_pi/titrator_gui.py --port /dev/ttyUSB0 --project-dir ~/diding
 ```
 
-### PySide6 界面说明
+### PySide6 / Qt6 界面说明
 
-当前 `raspberry_pi/titrator_gui.py` 默认启动 PySide6 Qt 界面。界面采用大字号卡片、触摸友好的按钮和深色日志窗口，适合树莓派本地屏幕操作。
+当前 `raspberry_pi/titrator_gui.py` 默认启动 PySide6 / Qt6 界面，SH800 使用 Python 3.12 环境运行。
 
-如果树莓派安装 PySide6 较慢，建议先确认网络稳定，再执行：
+检查 PySide6 是否可用：
 
 ```bash
-pip3 install PySide6
+python3.12 -c "from PySide6.QtWidgets import QApplication; print('PySide6 ok')"
 ```
 
-如果使用系统包管理器安装 Qt/PySide6，也可以，只要 `python3 -c "from PySide6.QtWidgets import QApplication"` 能正常通过即可。
+如果这条命令失败，需要在启动 GUI 的同一个 Python 3.12 环境里重新安装 PySide6。
 
-## 树莓派 GUI 页面说明
+## SH800 GUI 页面说明
 
 ### 滴定控制页
 
@@ -812,13 +812,13 @@ pip3 install PySide6
 
 ### 网络设置页
 
-该页面用于管理树莓派自身 WiFi。
+该页面用于管理SH800自身 WiFi。
 
 功能包括：
 
-- 显示树莓派 WiFi 状态。
+- 显示SH800 WiFi 状态。
 - 显示当前连接的 WiFi 名称。
-- 显示树莓派 IP 地址。
+- 显示SH800 IP 地址。
 - 打开 WiFi。
 - 关闭 WiFi。
 - 输入 SSID 和密码连接 WiFi。
@@ -830,7 +830,7 @@ pip3 install PySide6
 802-11-wireless-security.psk = 输入的密码
 ```
 
-这样可以避免某些树莓派系统上出现：
+这样可以避免某些SH800系统上出现：
 
 ```text
 802-11-wireless-security.key-mgmt: 缺少属性
@@ -838,7 +838,7 @@ pip3 install PySide6
 
 ### 系统更新页
 
-该页面用于更新树莓派项目代码和 ESP32 固件。
+该页面用于更新SH800项目代码和 ESP32 固件。
 
 功能包括：
 
@@ -852,7 +852,7 @@ pip3 install PySide6
 
 推荐使用顺序：
 
-1. 确认树莓派已连接 WiFi。
+1. 确认SH800已连接 WiFi。
 2. 确认 ESP32 已连接同一个实验室局域网。
 3. 在滴定控制页或通信日志里查看 ESP32 遥测中的 IP。
 4. 到系统更新页点击“检查 Gitee 更新”。
@@ -864,7 +864,7 @@ pip3 install PySide6
 
 ## Gitee / GitHub 远程仓库
 
-树莓派现场优先使用 Gitee：
+SH800现场优先使用 Gitee：
 
 ```text
 https://gitee.com/bidi2004/diding.git
@@ -882,7 +882,7 @@ https://github.com/ljpkljpklpjk/ESP_DiDing.git
 codex/new_feature
 ```
 
-树莓派 GUI 中的“检查 Gitee 更新”和“从 Gitee 更新代码”默认使用：
+SH800 GUI 中的“检查 Gitee 更新”和“从 Gitee 更新代码”默认使用：
 
 ```text
 远程名：gitee
@@ -892,7 +892,7 @@ codex/new_feature
 
 ## 串口手动测试方法
 
-如果不启动树莓派 GUI，也可以用串口工具直接测试 ESP32。
+如果不启动SH800 GUI，也可以用串口工具直接测试 ESP32。
 
 ### 串口参数
 
@@ -950,11 +950,11 @@ codex/new_feature
 
 ## 常见问题排查
 
-### 1. 树莓派 GUI 没有数据
+### 1. SH800 GUI 没有数据
 
 检查：
 
-- ESP32 是否通过 USB 连接树莓派。
+- ESP32 是否通过 USB 连接SH800。
 - 串口号是否正确。
 - 是否使用了 `/dev/ttyACM0` 或 `/dev/ttyUSB0`。
 - ESP32 固件是否已经烧录。
@@ -1045,7 +1045,7 @@ ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null
 
 并检查电源、驱动电流和机械阻力。
 
-### 8. 树莓派连接 WiFi 报 key-mgmt 缺少属性
+### 8. SH800连接 WiFi 报 key-mgmt 缺少属性
 
 当前 GUI 已针对加密 WiFi 显式写入：
 
@@ -1053,7 +1053,7 @@ ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null
 802-11-wireless-security.key-mgmt = wpa-psk
 ```
 
-如果仍失败，可以在树莓派终端检查：
+如果仍失败，可以在SH800终端检查：
 
 ```bash
 nmcli connection show
@@ -1066,13 +1066,13 @@ nmcli dev wifi list
 nmcli connection delete "WiFi名称"
 ```
 
-### 9. 树莓派 OTA 没有进度
+### 9. SH800 OTA 没有进度
 
 当前 GUI 的系统更新页有 OTA 实时输出框。
 
 如果长时间没有输出，检查：
 
-- ESP32 和树莓派是否在同一个局域网。
+- ESP32 和SH800是否在同一个局域网。
 - ESP32 遥测里是否有 `wifi_connected:true`。
 - ESP32 遥测里是否有正确 IP。
 - OTA IP 是否填写正确。
@@ -1089,14 +1089,14 @@ ESP32 在 OTA 过程中可能返回每个数据块的确认值，例如：
 
 这是正常块确认，不是错误。当前上传脚本已经兼容这种响应。
 
-### 11. 树莓派拉取 GitHub 很慢或失败
+### 11. SH800拉取 GitHub 很慢或失败
 
-现场树莓派优先使用 Gitee，不需要访问 GitHub。
+现场SH800优先使用 Gitee，不需要访问 GitHub。
 
 确认远程源：
 
 ```bash
-cd /home/pi/diding
+cd ~/diding
 git remote -v
 ```
 
@@ -1125,7 +1125,7 @@ git remote add gitee https://gitee.com/bidi2004/diding.git 2>/dev/null || git re
 4. 提交源码和预编译固件。
 5. 推送到 Gitee/GitHub。
 
-### 只修改树莓派上位机后
+### 只修改SH800上位机后
 
 如果只修改：
 
@@ -1196,34 +1196,34 @@ C:/Users/MI/.platformio/penv/Scripts/platformio.exe run -d D:/galgame/ESP_DiDing
 python D:/galgame/ESP_DiDing_codex_new_feature/tools/release_firmware.py --project-dir D:/galgame/ESP_DiDing_codex_new_feature
 ```
 
-### 树莓派首次克隆
+### SH800首次克隆
 
 ```bash
-cd /home/pi
+cd ~
 git clone -b codex/new_feature https://gitee.com/bidi2004/diding.git diding
-cd /home/pi/diding
-pip3 install pyserial PySide6
+cd ~/diding
+python3.12 -m pip install --user pyserial PySide6
 ```
 
-### 树莓派启动 GUI
+### SH800 启动 GUI
 
 ```bash
-cd /home/pi/diding
-python3 raspberry_pi/titrator_gui.py --port /dev/ttyACM0 --project-dir /home/pi/diding
+cd ~/diding
+python3.12 raspberry_pi/titrator_gui.py --project-dir ~/diding
 ```
 
-或：
+手动指定串口：
 
 ```bash
-cd /home/pi/diding
-python3 raspberry_pi/titrator_gui.py --port /dev/ttyUSB0 --project-dir /home/pi/diding
+python3.12 raspberry_pi/titrator_gui.py --port /dev/ttyACM0 --project-dir ~/diding
+python3.12 raspberry_pi/titrator_gui.py --port /dev/ttyUSB0 --project-dir ~/diding
 ```
 
-### 树莓派命令行 OTA
+### SH800 命令行 OTA
 
 ```bash
-cd /home/pi/diding
-python3 raspberry_pi/ota_update.py --host 192.168.x.x
+cd ~/diding
+python3.12 raspberry_pi/ota_update.py --host 192.168.x.x
 ```
 
 ### 检查 Python 文件语法
@@ -1239,10 +1239,10 @@ python -m py_compile raspberry_pi/titrator_gui.py raspberry_pi/ota_update.py ras
 1. Windows 电脑通过 USB 给 ESP32 烧录一次固件。
 2. 确认 ESP32 串口输出正常。
 3. 确认 ESP32 能连接实验室 WiFi。
-4. 在树莓派上克隆 Gitee 仓库到 `/home/pi/diding`。
-5. 安装 `PySide6`、`pyserial`、`git`、`network-manager`。
-6. ESP32 USB 接到树莓派。
-7. 启动树莓派 PySide6 GUI。
+4. 在SH800上克隆 Gitee 仓库到 `~/diding`。
+5. 安装 Python 3.12、`PySide6`、`pyserial`、`git`、`network-manager`。
+6. ESP32 USB 接到SH800。
+7. 启动 SH800 PySide6 / Qt6 GUI。
 8. 在 GUI 中确认 pH、温度、电压、MLX90640、AS7341、PWM、滑台状态能显示。
 9. 在 GUI 中测试滑台使能、移动、停止、急停。
 10. 在 GUI 系统更新页测试 OTA。
@@ -1252,7 +1252,7 @@ python -m py_compile raspberry_pi/titrator_gui.py raspberry_pi/ota_update.py ras
 1. 管理者修改代码。
 2. 如果改了 ESP32 固件，管理者生成新的预编译 `firmware.bin`。
 3. 管理者提交并推送到 Gitee/GitHub。
-4. 实验室用户在树莓派 GUI 点击“从 Gitee 更新代码”。
+4. 实验室用户在SH800 GUI 点击“从 Gitee 更新代码”。
 5. 如果有新固件，点击“更新 ESP32 固件 OTA”。
 6. 等待 ESP32 重启并恢复遥测。
 

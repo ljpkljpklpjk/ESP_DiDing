@@ -1,5 +1,5 @@
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QSizePolicy, QTextEdit, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QSizePolicy, QScrollArea, QTextEdit, QVBoxLayout, QWidget
 
 
 def make_panel(title=None):
@@ -19,12 +19,14 @@ class ValueCard(QFrame):
     def __init__(self, title, value="--", accent=None):
         super().__init__()
         self.setObjectName("card")
+        self.setMinimumWidth(120)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(16, 14, 16, 14)
-        layout.setSpacing(8)
+        layout.setContentsMargins(12, 10, 12, 10)
+        layout.setSpacing(6)
         self.title_label = QLabel(title)
         self.title_label.setObjectName("cardTitle")
+        self.title_label.setWordWrap(True)
         self.value_label = QLabel(value)
         self.value_label.setObjectName("cardValue")
         self.value_label.setWordWrap(True)
@@ -39,18 +41,21 @@ class ValueCard(QFrame):
 
 def add_cards_grid(parent_layout, cards, columns=4):
     grid = QGridLayout()
-    grid.setSpacing(12)
+    grid.setSpacing(8)
     for index, card in enumerate(cards):
         grid.addWidget(card, index // columns, index % columns)
+    for column in range(columns):
+        grid.setColumnStretch(column, 1)
     parent_layout.addLayout(grid)
     return grid
 
 
 def input_row(label, line_edit, button_text=None, callback=None, primary=False):
     row = QHBoxLayout()
-    row.setSpacing(10)
+    row.setSpacing(8)
     text = QLabel(label)
-    text.setMinimumWidth(105)
+    text.setMinimumWidth(92)
+    text.setWordWrap(True)
     row.addWidget(text)
     row.addWidget(line_edit, 1)
     button = None
@@ -85,7 +90,7 @@ def make_button(text, callback=None, primary=False, danger=False):
 def make_log():
     log = QTextEdit()
     log.setReadOnly(True)
-    log.setMinimumHeight(150)
+    log.setMinimumHeight(120)
     return log
 
 
@@ -104,8 +109,14 @@ def append_log(log, text, max_lines=500):
 
 
 def page_widget():
-    page = QWidget()
-    layout = QVBoxLayout(page)
-    layout.setContentsMargins(18, 18, 18, 18)
-    layout.setSpacing(14)
-    return page, layout
+    content = QWidget()
+    layout = QVBoxLayout(content)
+    layout.setContentsMargins(12, 12, 12, 12)
+    layout.setSpacing(10)
+
+    scroll = QScrollArea()
+    scroll.setWidgetResizable(True)
+    scroll.setFrameShape(QFrame.NoFrame)
+    scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+    scroll.setWidget(content)
+    return scroll, layout

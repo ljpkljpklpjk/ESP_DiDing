@@ -6,7 +6,7 @@ QMainWindow, QWidget {
     background: #f3f6fb;
     color: #0f172a;
     font-family: "Microsoft YaHei", "Noto Sans CJK SC", "Arial";
-    font-size: 15px;
+    font-size: 14px;
 }
 QTabWidget::pane {
     border: 0;
@@ -15,11 +15,11 @@ QTabWidget::pane {
 QTabBar::tab {
     background: #e5edf7;
     color: #334155;
-    padding: 13px 26px;
-    margin-right: 8px;
-    border-top-left-radius: 14px;
-    border-top-right-radius: 14px;
-    font-size: 17px;
+    padding: 10px 18px;
+    margin-right: 6px;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    font-size: 15px;
     font-weight: 700;
 }
 QTabBar::tab:selected {
@@ -28,41 +28,41 @@ QTabBar::tab:selected {
 }
 QLabel#titleLabel {
     color: #0f172a;
-    font-size: 26px;
+    font-size: 21px;
     font-weight: 800;
 }
 QLabel#sectionTitle {
     color: #0f172a;
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 800;
 }
 QLabel#cardTitle {
     color: #64748b;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 700;
 }
 QLabel#cardValue {
     color: #0f172a;
-    font-size: 28px;
+    font-size: 22px;
     font-weight: 900;
 }
 QFrame#card, QFrame#panel {
     background: #ffffff;
     border: 1px solid #e2e8f0;
-    border-radius: 18px;
+    border-radius: 8px;
 }
 QFrame#topBar {
     background: #ffffff;
     border: 1px solid #dbe7f5;
-    border-radius: 20px;
+    border-radius: 8px;
 }
 QLineEdit {
     background: #ffffff;
     color: #0f172a;
     border: 1px solid #cbd5e1;
-    border-radius: 12px;
-    padding: 10px 12px;
-    min-height: 26px;
+    border-radius: 8px;
+    padding: 8px 10px;
+    min-height: 24px;
     selection-background-color: #2563eb;
 }
 QLineEdit:focus {
@@ -72,9 +72,9 @@ QPushButton {
     background: #e8eef8;
     color: #0f172a;
     border: 0;
-    border-radius: 13px;
-    padding: 12px 16px;
-    min-height: 26px;
+    border-radius: 8px;
+    padding: 9px 12px;
+    min-height: 24px;
     font-weight: 700;
 }
 QPushButton:hover {
@@ -97,8 +97,8 @@ QPushButton#primaryButton:hover {
 QPushButton#dangerButton {
     background: #dc2626;
     color: #ffffff;
-    font-size: 18px;
-    min-height: 38px;
+    font-size: 16px;
+    min-height: 32px;
 }
 QPushButton#dangerButton:hover {
     background: #b91c1c;
@@ -107,16 +107,16 @@ QTextEdit {
     background: #0f172a;
     color: #dbeafe;
     border: 0;
-    border-radius: 16px;
-    padding: 12px;
+    border-radius: 8px;
+    padding: 10px;
     font-family: "Consolas", "Courier New";
     font-size: 13px;
 }
 QProgressBar {
     background: #e2e8f0;
     border: 0;
-    border-radius: 9px;
-    min-height: 18px;
+    border-radius: 8px;
+    min-height: 16px;
     text-align: center;
 }
 QProgressBar::chunk {

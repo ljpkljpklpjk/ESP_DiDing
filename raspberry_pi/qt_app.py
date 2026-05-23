@@ -3,16 +3,16 @@ import queue
 import time
 from pathlib import Path
 
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QMainWindow, QMessageBox, QTabWidget, QVBoxLayout, QWidget
 
-from protocol import build_command, fmt_value
+from protocol import build_command, first_value, fmt_value
 from qt_pages.control_page import ControlPage
 from qt_pages.network_page import NetworkPage
 from qt_pages.update_page import UpdatePage
 from qt_widgets import append_log, make_button
 from qt_workers import OtaTask, SystemTask, thread_pool
-from system_manager import DEFAULT_OTA_PASSWORD, PiSystemManager
+from system_manager import DEFAULT_OTA_PASSWORD, LinuxSystemManager
 
 
 class TitratorQtApp(QMainWindow):
@@ -21,34 +21,39 @@ class TitratorQtApp(QMainWindow):
         self.worker = worker
         self.rx_queue = worker.rx_queue
         self.command_id = 1
-        self.system = PiSystemManager(project_dir)
+        self.system = LinuxSystemManager(project_dir)
         self.ota_running = False
         self.ota_start_time = 0.0
         self.ota_last_output_time = 0.0
         self.pending_telemetry = None
 
         self.setWindowTitle("ESP32 自动滴定仪上位机")
-        self.resize(1180, 760)
-        self.setMinimumSize(1024, 680)
+        self.resize(1024, 640)
+        self.setMinimumSize(760, 460)
 
         central = QWidget()
         root = QVBoxLayout(central)
-        root.setContentsMargins(16, 16, 16, 16)
-        root.setSpacing(14)
+        root.setContentsMargins(10, 10, 10, 10)
+        root.setSpacing(8)
         self.setCentralWidget(central)
 
         top_bar = QFrame()
         top_bar.setObjectName("topBar")
         top_layout = QHBoxLayout(top_bar)
-        top_layout.setContentsMargins(18, 12, 18, 12)
+        top_layout.setContentsMargins(12, 8, 12, 8)
+        top_layout.setSpacing(8)
         title = QLabel("ESP32 自动滴定仪")
         title.setObjectName("titleLabel")
         self.status_label = QLabel("已启动，等待 ESP32 遥测...")
         self.ip_label = QLabel("ESP32 IP: --")
+        self.status_label.setWordWrap(True)
+        self.ip_label.setWordWrap(True)
+        self.status_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self.ip_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         top_layout.addWidget(title)
         top_layout.addStretch(1)
-        top_layout.addWidget(self.ip_label)
-        top_layout.addWidget(self.status_label)
+        top_layout.addWidget(self.ip_label, 0)
+        top_layout.addWidget(self.status_label, 1)
         top_layout.addWidget(make_button("急停", self.emergency_stop, danger=True))
         root.addWidget(top_bar)
 
@@ -256,13 +261,11 @@ class TitratorQtApp(QMainWindow):
 
     def handle_message(self, msg):
         msg_type = msg.get("type")
-        if msg_type == "telemetry":
+        if self.is_telemetry_message(msg):
             self.pending_telemetry = msg
             return
         self.log_serial("RX " + json.dumps(msg, ensure_ascii=False))
-        if msg_type == "telemetry":
-            self.update_telemetry(msg)
-        elif msg_type == "boot":
+        if msg_type == "boot":
             self.status_label.setText("ESP32 已启动")
             if "slider" in msg:
                 self.control_page.update_slider(msg["slider"])
@@ -275,8 +278,21 @@ class TitratorQtApp(QMainWindow):
         elif msg_type == "serial_error":
             self.status_label.setText(f"串口错误: {msg.get('message', '--')}")
 
+    @staticmethod
+    def is_telemetry_message(msg):
+        if not isinstance(msg, dict):
+            return False
+        if msg.get("type") == "telemetry":
+            return True
+        telemetry_keys = (
+            "ph", "pH", "voltage", "voltage_v", "temperature_c", "temp_c",
+            "pwm1_percent", "pump_percent", "as7341_intensity",
+            "mlx90640_avg_temp_c", "slider", "wifi_connected", "ota_ready",
+        )
+        return any(key in msg for key in telemetry_keys)
+
     def update_telemetry(self, msg):
-        ip = msg.get("ip")
+        ip = first_value(msg, "ip", "esp32_ip")
         if ip:
             self.ip_label.setText(f"ESP32 IP: {ip}")
             self.update_page.set_esp32_ip(ip)

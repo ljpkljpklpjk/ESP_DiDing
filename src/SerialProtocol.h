@@ -13,6 +13,7 @@ class SerialProtocol {
 
   void begin();
   void processInput(LineHandler handler, void *context);
+  void sendTextLine(const char *text);
   void sendJson(JsonDocument &doc);
   void sendAck(long id, float pwm1Percent, float pumpPercent);
   void sendDone(long id, bool ok);

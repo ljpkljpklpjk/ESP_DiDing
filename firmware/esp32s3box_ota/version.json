@@ -1,8 +1,8 @@
 {
-    "version":  "v2026.05.27.1",
+    "version":  "v2026.05.27.2",
     "environment":  "esp32s3box_ota",
     "filename":  "firmware.bin",
-    "size_bytes":  824048,
-    "built_at":  "2026-05-27T16:54:25+08:00",
-    "description":  "ESP32 OTA 固件，默认 RS485 UART 通信"
+    "size_bytes":  824224,
+    "built_at":  "2026-05-27T18:21:01+08:00",
+    "description":  "ESP32 OTA 固件，RS485 使用 GPIO43/GPIO44，上电输出 OK 自检"
 }

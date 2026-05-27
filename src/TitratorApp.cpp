@@ -7,6 +7,12 @@
 
 void TitratorApp::begin() {
   serial_.begin();
+  const uint32_t bootOkStartMs = millis();
+  while (millis() - bootOkStartMs < AppConfig::COMM_BOOT_OK_DURATION_MS) {
+    serial_.sendTextLine("OK");
+    delay(AppConfig::COMM_BOOT_OK_INTERVAL_MS);
+  }
+
   slider_.begin();
 
   if (!outputs_.begin()) {

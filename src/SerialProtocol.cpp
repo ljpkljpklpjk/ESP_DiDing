@@ -80,6 +80,21 @@ void SerialProtocol::processInput(LineHandler handler, void *context) {
   }
 }
 
+void SerialProtocol::sendTextLine(const char *text) {
+  ensureTxMutex();
+  if (txMutex_) {
+    xSemaphoreTake(txMutex_, portMAX_DELAY);
+  }
+  Stream &serialPort = port();
+  setRs485Transmit(true);
+  serialPort.println(text);
+  serialPort.flush();
+  setRs485Transmit(false);
+  if (txMutex_) {
+    xSemaphoreGive(txMutex_);
+  }
+}
+
 void SerialProtocol::sendJson(JsonDocument &doc) {
   ensureTxMutex();
   if (txMutex_) {

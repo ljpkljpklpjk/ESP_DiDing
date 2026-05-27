@@ -66,13 +66,15 @@ python3.12 raspberry_pi/titrator_gui.py --port /dev/ttyUSB0 --project-dir ~/didi
 ESP32 端默认 RS485 引脚：
 
 ```text
-ESP32 GPIO17 TX -> RS485 模块 DI
-ESP32 GPIO18 RX -> RS485 模块 RO
+ESP32 GPIO43 TX -> RS485 模块 DI
+ESP32 GPIO44 RX -> RS485 模块 RO
 ESP32 GPIO16 DE -> RS485 模块 DE/RE
 ESP32 GND       -> RS485 模块 GND
 RS485 A         -> SH800 RS485 A
 RS485 B         -> SH800 RS485 B
 ```
+
+ESP32 上电后会先连续输出约 3 秒 `OK`，用于确认 RS485 发送链路。看到 `OK` 后，才会进入正常 JSON Lines 遥测。
 
 如果串口没有权限，把当前用户加入 `dialout` 组后重新登录：
 

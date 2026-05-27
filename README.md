@@ -2,9 +2,9 @@
 
 ## 版本信息
 
-- 版本号：v2026.05.27.1
-- 提交时间：2026-05-27 16:54:25 +0800
-- 更新内容：ESP32 与 SH800 上位机通信改为 RS485，ESP32 默认使用 UART1（TX=GPIO17、RX=GPIO18、DE=GPIO16），SH800 自动发现板载 RS485/USB 串口，并重新生成预编译 OTA 固件。
+- 版本号：v2026.05.27.2
+- 提交时间：2026-05-27 18:25:00 +0800
+- 更新内容：ESP32 RS485 默认引脚改为 UART0 模组脚位对应的 GPIO43/GPIO44，上电后先连续输出 3 秒 `OK` 用于验证 RS485 发送链路，并重新生成预编译 OTA 固件。
 
 ## 项目概述
 
@@ -305,13 +305,23 @@ ESP32 主循环中最需要高频调用的是丝杆滑台的 `AccelStepper::run(
 ESP32 默认 RS485 引脚：
 
 ```text
-ESP32 GPIO17 TX -> RS485 模块 DI
-ESP32 GPIO18 RX -> RS485 模块 RO
+ESP32 GPIO43 TX -> RS485 模块 DI
+ESP32 GPIO44 RX -> RS485 模块 RO
 ESP32 GPIO16 DE -> RS485 模块 DE/RE
 ESP32 GND       -> RS485 模块 GND
 RS485 A         -> SH800 RS485 A
 RS485 B         -> SH800 RS485 B
 ```
+
+ESP32 上电后会先按当前通信参数连续输出约 3 秒：
+
+```text
+OK
+OK
+OK
+```
+
+看到 `OK` 说明 ESP32 到 RS485 总线的发送链路至少已经工作，之后才会进入正常 JSON Lines 遥测。
 
 ### 通信方向
 

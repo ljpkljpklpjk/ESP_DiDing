@@ -118,7 +118,14 @@ class SerialWorker:
 
     def start(self):
         self.resolved_port = resolve_serial_port(self.port)
-        self._serial = serial.Serial(self.resolved_port, self.baudrate, timeout=0.2)
+        self._serial = serial.Serial(
+            port=self.resolved_port,
+            baudrate=self.baudrate,
+            bytesize=serial.EIGHTBITS,
+            parity=serial.PARITY_NONE,
+            stopbits=serial.STOPBITS_ONE,
+            timeout=0.2,
+        )
         self._running.set()
         self._thread = threading.Thread(target=self._read_loop, daemon=True)
         self._thread.start()

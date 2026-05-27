@@ -16,13 +16,13 @@
    - 负责直接连接和控制传感器、执行器。
    - 负责采集 pH、电压、温度等数据。
    - 负责控制 PWM 输出、蠕动泵、丝杆滑台。
-   - 通过串口 JSON Lines 与SH800通信。
+   - 通过 RS485 JSON Lines 与 SH800 通信。
    - 支持 WiFi 与 ArduinoOTA 远程固件更新。
 
 2. **SH800 上位机**
    - 运行本仓库内的 PySide6 / Qt6 图形界面。
-   - 通过 USB 串口与 ESP32-S3 通信。
-   - 在SH800本地屏幕上显示滴定仪状态。
+   - 通过 RS485 与 ESP32-S3 通信。
+   - 在 SH800 本地屏幕上显示滴定仪状态。
    - 提供 PWM、蠕动泵、丝杆滑台控制按钮。
    - 提供 WiFi 打开/关闭、连接 WiFi、查看 IP 功能。
    - 提供从 Gitee 检查更新、拉取更新、通过 OTA 更新 ESP32 固件的功能。
@@ -72,9 +72,9 @@
 3. 管理者把生成好的预编译固件 `firmware/esp32s3box_ota/firmware.bin` 提交并推送到 Gitee/GitHub。
 4. SH800固定从 Gitee 拉取项目更新。
 5. SH800本地屏幕运行 `raspberry_pi/titrator_gui.py`。
-6. 用户在SH800界面点击“从 Gitee 更新代码”。
-7. 用户在SH800界面点击“更新 ESP32 固件 OTA”。
-8. SH800直接把仓库里的预编译固件上传给 ESP32，不在SH800上编译。
+6. 用户在 SH800 界面点击“从 Gitee 更新代码”。
+7. 用户在 SH800 界面点击“更新 ESP32 固件 OTA”。
+8. SH800 直接把仓库里的预编译固件上传给 ESP32，不在 SH800 上编译。
 
 这样做的好处是：
 
@@ -552,7 +552,7 @@ ESP32 收到并接受命令后回传：
 C:/Users/MI/.platformio/penv/Scripts/platformio.exe
 ```
 
-### 编译默认 USB 固件
+### 编译默认固件
 
 ```bash
 C:/Users/MI/.platformio/penv/Scripts/platformio.exe run -d D:/galgame/ESP_DiDing_codex_new_feature
@@ -1068,7 +1068,7 @@ ls /dev/ttyUSB* /dev/ttyS* /dev/ttyAMA* /dev/ttyFIQ* 2>/dev/null
 802-11-wireless-security.key-mgmt = wpa-psk
 ```
 
-如果仍失败，可以在SH800终端检查：
+如果仍失败，可以在 SH800 终端检查：
 
 ```bash
 nmcli connection show
@@ -1253,11 +1253,11 @@ python -m py_compile raspberry_pi/titrator_gui.py raspberry_pi/ota_update.py ras
 ### 第一次部署
 
 1. Windows 电脑通过 USB 给 ESP32 烧录一次固件。
-2. 确认 ESP32 串口输出正常。
+2. 确认 ESP32 RS485 遥测输出正常。
 3. 确认 ESP32 能连接实验室 WiFi。
-4. 在SH800上克隆 Gitee 仓库到 `~/diding`。
+4. 在 SH800 上克隆 Gitee 仓库到 `~/diding`。
 5. 安装 Python 3.12、`PySide6`、`pyserial`、`git`、`network-manager`。
-6. ESP32 USB 接到SH800。
+6. ESP32 通过 RS485 接到 SH800。
 7. 启动 SH800 PySide6 / Qt6 GUI。
 8. 在 GUI 中确认 pH、温度、电压、MLX90640、AS7341、PWM、滑台状态能显示。
 9. 在 GUI 中测试滑台使能、移动、停止、急停。
@@ -1268,7 +1268,7 @@ python -m py_compile raspberry_pi/titrator_gui.py raspberry_pi/ota_update.py ras
 1. 管理者修改代码。
 2. 如果改了 ESP32 固件，管理者生成新的预编译 `firmware.bin`。
 3. 管理者提交并推送到 Gitee/GitHub。
-4. 实验室用户在SH800 GUI 点击“从 Gitee 更新代码”。
+4. 实验室用户在 SH800 GUI 点击“从 Gitee 更新代码”。
 5. 如果有新固件，点击“更新 ESP32 固件 OTA”。
 6. 等待 ESP32 重启并恢复遥测。
 

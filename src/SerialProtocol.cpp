@@ -2,7 +2,50 @@
 
 #include "AppConfig.h"
 
-SerialProtocol::SerialProtocol() = default;
+SerialProtocol::SerialProtocol() : rs485Serial_(AppConfig::RS485_UART_NUM) {}
+
+void SerialProtocol::begin() {
+  if (AppConfig::COMM_INTERFACE == AppConfig::CommInterface::Rs485Uart) {
+    usingRs485_ = true;
+    if (AppConfig::RS485_DE_PIN >= 0) {
+      pinMode(AppConfig::RS485_DE_PIN, OUTPUT);
+    }
+    if (AppConfig::RS485_RE_PIN >= 0) {
+      pinMode(AppConfig::RS485_RE_PIN, OUTPUT);
+    }
+    setRs485Transmit(false);
+    rs485Serial_.begin(AppConfig::COMM_BAUDRATE, SERIAL_8N1,
+                       AppConfig::RS485_RX_PIN, AppConfig::RS485_TX_PIN);
+    return;
+  }
+
+  usingRs485_ = false;
+  Serial.begin(AppConfig::COMM_BAUDRATE);
+}
+
+Stream &SerialProtocol::port() {
+  if (usingRs485_) {
+    return rs485Serial_;
+  }
+  return Serial;
+}
+
+void SerialProtocol::setRs485Transmit(bool enabled) {
+  if (!usingRs485_) {
+    return;
+  }
+  const uint8_t active = AppConfig::RS485_ENABLE_ACTIVE_HIGH ? HIGH : LOW;
+  const uint8_t inactive = AppConfig::RS485_ENABLE_ACTIVE_HIGH ? LOW : HIGH;
+  if (AppConfig::RS485_DE_PIN >= 0) {
+    digitalWrite(AppConfig::RS485_DE_PIN, enabled ? active : inactive);
+  }
+  if (AppConfig::RS485_RE_PIN >= 0) {
+    digitalWrite(AppConfig::RS485_RE_PIN, enabled ? active : inactive);
+  }
+  if (enabled && AppConfig::RS485_TX_SETTLE_US > 0) {
+    delayMicroseconds(AppConfig::RS485_TX_SETTLE_US);
+  }
+}
 
 void SerialProtocol::ensureTxMutex() {
   if (!txMutex_) {
@@ -12,9 +55,11 @@ void SerialProtocol::ensureTxMutex() {
 
 void SerialProtocol::processInput(LineHandler handler, void *context) {
   size_t processed = 0;
-  while (Serial.available() > 0 && processed < AppConfig::SERIAL_BYTES_PER_LOOP) {
+  Stream &serialPort = port();
+  while (serialPort.available() > 0 &&
+         processed < AppConfig::SERIAL_BYTES_PER_LOOP) {
     ++processed;
-    const char c = static_cast<char>(Serial.read());
+    const char c = static_cast<char>(serialPort.read());
     if (c == '\r') {
       continue;
     }
@@ -40,8 +85,12 @@ void SerialProtocol::sendJson(JsonDocument &doc) {
   if (txMutex_) {
     xSemaphoreTake(txMutex_, portMAX_DELAY);
   }
-  serializeJson(doc, Serial);
-  Serial.println();
+  Stream &serialPort = port();
+  setRs485Transmit(true);
+  serializeJson(doc, serialPort);
+  serialPort.println();
+  serialPort.flush();
+  setRs485Transmit(false);
   if (txMutex_) {
     xSemaphoreGive(txMutex_);
   }

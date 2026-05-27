@@ -5,6 +5,11 @@
 
 namespace AppConfig {
 
+enum class CommInterface {
+  UsbSerial,
+  Rs485Uart,
+};
+
 inline ADS1220Pins adsPins() {
   return ADS1220Pins{
       .cs = 21,
@@ -35,6 +40,15 @@ static constexpr uint32_t PUMP_PPM_FREQ_HZ = 500;
 static constexpr uint8_t PUMP_PWM_RES_BITS = 10;
 
 static constexpr bool SERIAL_DEBUG_TEXT = false;
+static constexpr CommInterface COMM_INTERFACE = CommInterface::Rs485Uart;
+static constexpr uint32_t COMM_BAUDRATE = 115200;
+static constexpr uint8_t RS485_UART_NUM = 1;
+static constexpr int8_t RS485_RX_PIN = 18;
+static constexpr int8_t RS485_TX_PIN = 17;
+static constexpr int8_t RS485_DE_PIN = 16;
+static constexpr int8_t RS485_RE_PIN = -1;
+static constexpr bool RS485_ENABLE_ACTIVE_HIGH = true;
+static constexpr uint32_t RS485_TX_SETTLE_US = 100;
 static constexpr uint32_t TELEMETRY_INTERVAL_MS = 1000;
 static constexpr uint32_t WIFI_RETRY_INTERVAL_MS = 10000;
 static constexpr size_t SERIAL_RX_BUF_SIZE = 320;

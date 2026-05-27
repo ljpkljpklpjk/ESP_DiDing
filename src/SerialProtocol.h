@@ -11,6 +11,7 @@ class SerialProtocol {
 
   SerialProtocol();
 
+  void begin();
   void processInput(LineHandler handler, void *context);
   void sendJson(JsonDocument &doc);
   void sendAck(long id, float pwm1Percent, float pumpPercent);
@@ -19,9 +20,13 @@ class SerialProtocol {
   static void setFloatOrNull(JsonDocument &doc, const char *key, float value);
 
  private:
+  Stream &port();
+  void setRs485Transmit(bool enabled);
   void handleLine(const char *line, LineHandler handler, void *context);
   void ensureTxMutex();
 
+  HardwareSerial rs485Serial_;
+  bool usingRs485_ = false;
   char rxBuf_[320];
   size_t rxLen_ = 0;
   SemaphoreHandle_t txMutex_ = nullptr;

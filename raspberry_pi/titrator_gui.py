@@ -15,7 +15,7 @@ def main():
     parser.add_argument(
         "--port",
         default=AUTO_PORT,
-        help="ESP32 serial port, or 'auto' to pick /dev/ttyACM* or /dev/ttyUSB* automatically",
+        help="ESP32 serial port, or 'auto' to pick SH800 RS485/USB serial automatically",
     )
     parser.add_argument("--baudrate", type=int, default=115200)
     parser.add_argument("--project-dir", default=str(DEFAULT_PROJECT_DIR), help="Project directory")

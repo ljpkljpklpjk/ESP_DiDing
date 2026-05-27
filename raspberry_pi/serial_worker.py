@@ -10,6 +10,14 @@ from serial.tools import list_ports
 
 AUTO_PORT = "auto"
 USB_PORT_PREFIXES = ("/dev/ttyACM", "/dev/ttyUSB")
+RS485_PORT_PREFIXES = ("/dev/ttyS", "/dev/ttyAMA", "/dev/ttyFIQ")
+AUTO_PORT_PATTERNS = (
+    "/dev/ttyUSB*",
+    "/dev/ttyACM*",
+    "/dev/ttyS*",
+    "/dev/ttyAMA*",
+    "/dev/ttyFIQ*",
+)
 
 
 def _looks_like_usb_serial(port_info):
@@ -20,6 +28,16 @@ def _looks_like_usb_serial(port_info):
     if device.startswith(USB_PORT_PREFIXES):
         return True
     return any(keyword in text for keyword in ("esp32", "usb serial", "cp210", "ch340", "wch", "silicon labs"))
+
+
+def _looks_like_rs485_serial(port_info):
+    device = port_info.device
+    description = (port_info.description or "").lower()
+    hwid = (port_info.hwid or "").lower()
+    text = f"{description} {hwid}"
+    if device.startswith(RS485_PORT_PREFIXES):
+        return True
+    return any(keyword in text for keyword in ("rs485", "uart", "serial port"))
 
 
 def _port_score(port_info):
@@ -34,18 +52,45 @@ def _port_score(port_info):
         return 1
     if _looks_like_usb_serial(port_info):
         return 2
+    if "rs485" in text:
+        return 3
+    if device.startswith("/dev/ttyS"):
+        return 10
+    if device.startswith("/dev/ttyAMA"):
+        return 11
+    if device.startswith("/dev/ttyFIQ"):
+        return 12
+    if _looks_like_rs485_serial(port_info):
+        return 20
     return 50
 
 
 def list_candidate_ports():
-    ports = [port for port in list_ports.comports() if _looks_like_usb_serial(port)]
+    ports = [
+        port for port in list_ports.comports()
+        if _looks_like_usb_serial(port) or _looks_like_rs485_serial(port)
+    ]
     if ports:
         return sorted(ports, key=lambda item: (_port_score(item), item.device))
 
     devices = []
-    for pattern in ("/dev/ttyACM*", "/dev/ttyUSB*"):
+    for pattern in AUTO_PORT_PATTERNS:
         devices.extend(glob(pattern))
-    return sorted(set(devices))
+    return sorted(set(devices), key=_device_score)
+
+
+def _device_score(device):
+    if device.startswith("/dev/ttyUSB"):
+        return (0, device)
+    if device.startswith("/dev/ttyACM"):
+        return (1, device)
+    if device.startswith("/dev/ttyS"):
+        return (2, device)
+    if device.startswith("/dev/ttyAMA"):
+        return (3, device)
+    if device.startswith("/dev/ttyFIQ"):
+        return (4, device)
+    return (50, device)
 
 
 def resolve_serial_port(port: str):
@@ -54,7 +99,7 @@ def resolve_serial_port(port: str):
 
     candidates = list_candidate_ports()
     if not candidates:
-        raise RuntimeError("未找到 ESP32 USB 串口，请检查 USB 连接，或用 --port 手动指定串口")
+        raise RuntimeError("未找到串口设备，请检查 SH800 RS485/USB 串口，或用 --port 手动指定串口")
 
     first = candidates[0]
     return first.device if hasattr(first, "device") else first

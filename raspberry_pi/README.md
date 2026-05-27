@@ -48,7 +48,7 @@ git branch --set-upstream-to=gitee/codex/new_feature codex/new_feature
 - 网络设置：查看 SH800 WiFi 状态、打开/关闭 WiFi、输入 SSID 和密码连接 WiFi。
 - 系统更新：检查项目更新、更新上位机代码、通过 OTA 更新 ESP32 下位机固件。
 
-ESP32 通过 USB 连接 SH800 时，Linux 串口通常是 `/dev/ttyACM0` 或 `/dev/ttyUSB0`。现在默认支持自动选择串口：
+ESP32 现在默认通过 RS485 连接 SH800。SH800 的 RS485 串口在 Ubuntu 中通常是 `/dev/ttyS*`、`/dev/ttyAMA*` 或 `/dev/ttyFIQ*`；如果使用 USB-RS485 转换器，也可能是 `/dev/ttyUSB0`。程序默认会自动选择这些串口：
 
 ```bash
 cd ~/diding
@@ -58,8 +58,20 @@ python3.12 raspberry_pi/titrator_gui.py --project-dir ~/diding
 也可以手动指定串口：
 
 ```bash
-python3.12 raspberry_pi/titrator_gui.py --port /dev/ttyACM0 --project-dir ~/diding
+python3.12 raspberry_pi/titrator_gui.py --port /dev/ttyS1 --project-dir ~/diding
+python3.12 raspberry_pi/titrator_gui.py --port /dev/ttyAMA0 --project-dir ~/diding
 python3.12 raspberry_pi/titrator_gui.py --port /dev/ttyUSB0 --project-dir ~/diding
+```
+
+ESP32 端默认 RS485 引脚：
+
+```text
+ESP32 GPIO17 TX -> RS485 模块 DI
+ESP32 GPIO18 RX -> RS485 模块 RO
+ESP32 GPIO16 DE -> RS485 模块 DE/RE
+ESP32 GND       -> RS485 模块 GND
+RS485 A         -> SH800 RS485 A
+RS485 B         -> SH800 RS485 B
 ```
 
 如果串口没有权限，把当前用户加入 `dialout` 组后重新登录：

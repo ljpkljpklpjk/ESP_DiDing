@@ -6,6 +6,7 @@
 #include "Telemetry.h"
 
 void TitratorApp::begin() {
+  serial_.begin();
   slider_.begin();
 
   if (!outputs_.begin()) {

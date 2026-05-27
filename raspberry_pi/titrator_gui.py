@@ -19,6 +19,8 @@ def main():
     )
     parser.add_argument("--baudrate", type=int, default=115200)
     parser.add_argument("--project-dir", default=str(DEFAULT_PROJECT_DIR), help="Project directory")
+    parser.add_argument("--log-dir", default=None, help="Paper-format data directory")
+    parser.add_argument("--run-id", default=None, help="Run id used for CSV/JSONL filenames")
     args = parser.parse_args()
 
     try:
@@ -43,7 +45,13 @@ def main():
         QMessageBox.critical(None, "串口打开失败", str(exc))
         return 1
 
-    window = TitratorQtApp(worker, Path(args.project_dir).expanduser().resolve())
+    log_dir = Path(args.log_dir).expanduser().resolve() if args.log_dir else None
+    window = TitratorQtApp(
+        worker,
+        Path(args.project_dir).expanduser().resolve(),
+        log_dir=log_dir,
+        run_id=args.run_id,
+    )
     if worker.resolved_port:
         window.status_label.setText(f"已连接串口 {worker.resolved_port}，等待 ESP32 遥测...")
     window.show()

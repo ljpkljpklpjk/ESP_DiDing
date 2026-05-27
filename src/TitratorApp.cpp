@@ -114,6 +114,7 @@ void TitratorApp::sensorTask() {
     if (!slider_.busy()) {
       sensors_.updatePh();
       sensors_.updateTemperature();
+      sensors_.updateTds();
       opticalThermal_.update();
     }
     vTaskDelay(pdMS_TO_TICKS(slider_.busy() ? 50 : 10));
@@ -162,6 +163,13 @@ void TitratorApp::handleCommand(JsonDocument &doc) {
   if (strcmp(cmd, "pump_stop") == 0) {
     outputs_.setPumpPercent(0.0f);
     sendAck(id);
+    return;
+  }
+
+  if (strcmp(cmd, "reset_dose") == 0) {
+    outputs_.resetDosingVolume();
+    sendAck(id);
+    sendTelemetry();
     return;
   }
 

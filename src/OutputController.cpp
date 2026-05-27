@@ -32,6 +32,7 @@ bool OutputController::begin() {
   if (!pwm1_.begin() || !pump_.begin()) {
     return false;
   }
+  lastDoseUpdateMs_ = millis();
   stopAll();
   return true;
 }
@@ -45,6 +46,7 @@ void OutputController::setPwm1Percent(float percent) {
 
 void OutputController::setPumpPercent(float percent) {
   lock();
+  updateDoseLocked(millis());
   pumpPercent_ = clampPercent(percent);
   pump_.setSpeedPercent(pumpPercent_);
   unlock();
@@ -54,6 +56,13 @@ void OutputController::stopAll() {
   lock();
   setPwm1Percent(0.0f);
   setPumpPercent(0.0f);
+  unlock();
+}
+
+void OutputController::resetDosingVolume() {
+  lock();
+  dosingVolumeMl_ = 0.0f;
+  lastDoseUpdateMs_ = millis();
   unlock();
 }
 
@@ -71,8 +80,38 @@ float OutputController::pumpPercent() {
   return result;
 }
 
+float OutputController::flowMlPerMin() {
+  lock();
+  const float result = pumpPercent_ * AppConfig::PUMP_MAX_FLOW_ML_MIN / 100.0f;
+  unlock();
+  return result;
+}
+
+float OutputController::dosingVolumeMl() {
+  lock();
+  updateDoseLocked(millis());
+  const float result = dosingVolumeMl_;
+  unlock();
+  return result;
+}
+
 float OutputController::clampPercent(float percent) {
   if (percent < 0.0f) return 0.0f;
   if (percent > 100.0f) return 100.0f;
   return percent;
+}
+
+void OutputController::updateDoseLocked(uint32_t nowMs) {
+  if (lastDoseUpdateMs_ == 0) {
+    lastDoseUpdateMs_ = nowMs;
+    return;
+  }
+  const uint32_t elapsedMs = nowMs - lastDoseUpdateMs_;
+  if (elapsedMs == 0) {
+    return;
+  }
+  const float flowMlPerMin =
+      pumpPercent_ * AppConfig::PUMP_MAX_FLOW_ML_MIN / 100.0f;
+  dosingVolumeMl_ += flowMlPerMin * static_cast<float>(elapsedMs) / 60000.0f;
+  lastDoseUpdateMs_ = nowMs;
 }

@@ -13,10 +13,11 @@ from qt_pages.update_page import UpdatePage
 from qt_widgets import append_log, make_button
 from qt_workers import OtaTask, SystemTask, thread_pool
 from system_manager import DEFAULT_OTA_PASSWORD, LinuxSystemManager
+from telemetry_logger import TelemetryLogger
 
 
 class TitratorQtApp(QMainWindow):
-    def __init__(self, worker, project_dir: Path):
+    def __init__(self, worker, project_dir: Path, log_dir: Path | None = None, run_id: str | None = None):
         super().__init__()
         self.worker = worker
         self.rx_queue = worker.rx_queue
@@ -26,6 +27,7 @@ class TitratorQtApp(QMainWindow):
         self.ota_start_time = 0.0
         self.ota_last_output_time = 0.0
         self.pending_telemetry = None
+        self.telemetry_logger = TelemetryLogger(project_dir, log_dir=log_dir, run_id=run_id)
 
         self.setWindowTitle("ESP32 自动滴定仪上位机")
         self.resize(1024, 640)
@@ -145,6 +147,9 @@ class TitratorQtApp(QMainWindow):
 
     def pump_stop(self):
         self.send_cmd("pump_stop")
+
+    def reset_dose(self):
+        self.send_cmd("reset_dose")
 
     def refresh_wifi_status(self):
         self.run_system_task("刷新 WiFi 状态", self.system.wifi_status, self.network_page.set_status)
@@ -286,6 +291,9 @@ class TitratorQtApp(QMainWindow):
             return True
         telemetry_keys = (
             "ph", "pH", "voltage", "voltage_v", "temperature_c", "temp_c",
+            "tds_ppm", "tds_voltage", "tof_distance_mm", "bme280_temperature_c",
+            "bme280_humidity_percent", "bme280_pressure_hpa", "absorbance_au",
+            "concentration", "flow_ml_min", "dosing_volume_ml",
             "pwm1_percent", "pump_percent", "as7341_intensity",
             "mlx90640_avg_temp_c", "slider", "wifi_connected", "ota_ready",
         )
@@ -304,6 +312,7 @@ class TitratorQtApp(QMainWindow):
         msg = self.pending_telemetry
         self.pending_telemetry = None
         self.log_serial("RX " + json.dumps(msg, ensure_ascii=False))
+        self.telemetry_logger.write(msg)
         self.update_telemetry(msg)
 
     def log_serial(self, text):
@@ -311,4 +320,5 @@ class TitratorQtApp(QMainWindow):
 
     def closeEvent(self, event):
         self.worker.stop()
+        self.telemetry_logger.close()
         event.accept()

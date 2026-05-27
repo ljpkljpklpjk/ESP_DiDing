@@ -44,7 +44,7 @@ git branch --set-upstream-to=gitee/codex/new_feature codex/new_feature
 
 上位机使用 Python 3.12 + PySide6 / Qt6 界面，包含：
 
-- 滴定控制：pH、温度、电压、PWM、蠕动泵、丝杆滑台、AS7341、MLX90640。
+- 滴定控制：pH、温度、电压、TDS、ToF、BME280、吸光度、浓度、流量、加药体积、PWM、蠕动泵、丝杆滑台、AS7341、MLX90640。
 - 网络设置：查看 SH800 WiFi 状态、打开/关闭 WiFi、输入 SSID 和密码连接 WiFi。
 - 系统更新：检查项目更新、更新上位机代码、通过 OTA 更新 ESP32 下位机固件。
 
@@ -61,6 +61,19 @@ python3.12 raspberry_pi/titrator_gui.py --project-dir ~/diding
 python3.12 raspberry_pi/titrator_gui.py --port /dev/ttyS1 --project-dir ~/diding
 python3.12 raspberry_pi/titrator_gui.py --port /dev/ttyAMA0 --project-dir ~/diding
 python3.12 raspberry_pi/titrator_gui.py --port /dev/ttyUSB0 --project-dir ~/diding
+```
+
+程序启动后会自动保存实验数据，默认目录为：
+
+```text
+~/diding/data_logs/paper_dataset/closed_loop/<run_id>.csv
+~/diding/data_logs/paper_dataset/serial_jsonl/<run_id>.jsonl
+```
+
+CSV 表头兼容旧论文数据集 `closed_loop/run_g1_01.csv`，JSONL 包含原始遥测并补充 `sensor` 嵌套字段。需要保存到指定目录时可以传入：
+
+```bash
+python3.12 raspberry_pi/titrator_gui.py --project-dir ~/diding --log-dir ~/diding/data_logs/paper_dataset --run-id run_test_01
 ```
 
 ESP32 端默认 RS485 引脚：

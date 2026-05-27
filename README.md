@@ -2,9 +2,9 @@
 
 ## 版本信息
 
-- 版本号：v2026.05.27.2
-- 提交时间：2026-05-27 18:25:00 +0800
-- 更新内容：ESP32 RS485 默认引脚改为 UART0 模组脚位对应的 GPIO43/GPIO44，上电后先连续输出 3 秒 `OK` 用于验证 RS485 发送链路，并重新生成预编译 OTA 固件。
+- 版本号：v2026.05.27.3
+- 提交时间：2026-05-27 22:20:55 +0800
+- 更新内容：增加 TDS、ToF、BME280、吸光度、浓度、流量和加药体积遥测；上位机按论文数据集格式同时保存 CSV 和 JSONL；重新生成预编译 OTA 固件。
 
 ## 项目概述
 
@@ -35,9 +35,14 @@
 
 - ADS1220 采集 pH 电极差分电压。
 - pH 电压换算。
+- ADS1220 AIN2-AIN3 采集 TDS 电压并换算 TDS。
 - DS18B20 温度采集。
 - AS7341 光谱传感器采样。
 - MLX90640 热成像传感器平均温度采样。
+- BME280 环境温度、湿度、气压采样。
+- VL53L0X ToF 距离采样。
+- 根据 AS7341 强度计算吸光度和浓度。
+- 根据蠕动泵百分比估算流量并积分加药体积。
 - PWM1 输出控制。
 - DFR0523 或兼容 PWM/PPM 蠕动泵控制。
 - TMC2209 STEP/DIR 丝杆滑台控制。
@@ -51,8 +56,9 @@
 ### 上位机功能
 
 - SH800 本地 PySide6 / Qt6 图形界面。
-- pH、温度、电压、PWM、蠕动泵、滑台状态实时显示。
+- pH、温度、电压、TDS、ToF、BME280、吸光度、浓度、PWM、蠕动泵、滑台状态实时显示。
 - AS7341 强度、变化率和 MLX90640 平均温度显示。
+- 自动按 `paper_dataset/closed_loop/*.csv` 和 `paper_dataset/serial_jsonl/*.jsonl` 结构保存实验数据。
 - PWM1 和蠕动泵百分比设置。
 - 丝杆滑台速度、加速度、移动距离、移动时间设置。
 - 丝杆滑台使能、关闭使能、停止、立即停止、清零、急停。
@@ -193,7 +199,32 @@ AS7341 GND   -> ESP32 GND
 MLX90640 GND -> ESP32 GND
 ```
 
-当前程序使用同一组 I2C 总线读取 AS7341 和 MLX90640。
+当前程序使用同一组 I2C 总线读取 AS7341、MLX90640、BME280 和 VL53L0X ToF。
+
+### BME280 与 VL53L0X ToF I2C 模块
+
+```text
+BME280 SDA  -> ESP32 GPIO7
+BME280 SCL  -> ESP32 GPIO8
+VL53L0X SDA -> ESP32 GPIO7
+VL53L0X SCL -> ESP32 GPIO8
+BME280 VCC  -> ESP32 3.3V
+VL53L0X VCC -> ESP32 3.3V
+BME280 GND  -> ESP32 GND
+VL53L0X GND -> ESP32 GND
+```
+
+BME280 地址自动尝试 `0x76` 和 `0x77`，VL53L0X 默认地址为 `0x29`。
+
+### TDS 模块
+
+```text
+TDS 信号差分输入 -> ADS1220 AIN2 / AIN3
+TDS VCC          -> ESP32 3.3V
+TDS GND          -> ESP32 GND
+```
+
+当前 TDS 公式使用温度补偿和配置常数 `TDS_CALIBRATION_FACTOR`，正式实验前需要用标准液重新标定。
 
 ### PWM1 输出与蠕动泵
 
@@ -805,6 +836,13 @@ python3.12 -c "from PySide6.QtWidgets import QApplication; print('PySide6 ok')"
 - pH。
 - DS18B20 温度。
 - pH 电极电压。
+- TDS。
+- ToF 距离。
+- BME280 环境温度、湿度、气压。
+- 吸光度。
+- 估算浓度。
+- 估算流量。
+- 累计加药体积。
 - MLX90640 32x24 热成像帧平均温度。
 - AS7341 绿、黄、红合成强度。
 - AS7341 强度变化率。
@@ -824,6 +862,7 @@ python3.12 -c "from PySide6.QtWidgets import QApplication; print('PySide6 ok')"
 - 设置 PWM1 百分比。
 - 设置蠕动泵百分比。
 - 停止蠕动泵。
+- 加药体积清零。
 - 设置滑台速度。
 - 设置滑台加速度。
 - 按距离移动滑台。
@@ -1199,6 +1238,10 @@ lib_deps =
   milesburton/DallasTemperature@^4.0.5
   bblanchon/ArduinoJson@^7.0.0
   waspinator/AccelStepper @ ^1.64
+  adafruit/Adafruit MLX90640
+  adafruit/Adafruit AS7341
+  adafruit/Adafruit BME280 Library
+  adafruit/Adafruit_VL53L0X
 
 [env:esp32s3box_ota]
 extends = env:esp32s3box

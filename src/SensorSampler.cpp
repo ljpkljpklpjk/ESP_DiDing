@@ -40,6 +40,42 @@ void SensorSampler::updatePh() {
   }
 }
 
+void SensorSampler::updateTds() {
+  const uint32_t now = millis();
+  if (now - lastTdsSampleMs_ < AppConfig::TDS_SAMPLE_INTERVAL_MS) {
+    return;
+  }
+  lastTdsSampleMs_ = now;
+
+  const float v = ads_.readVoltage(ADS1220Module::AIN2_AIN3,
+                                   AppConfig::ADS1220_READ_TIMEOUT_MS);
+  if (isnan(v)) {
+    tdsVoltage_ = NAN;
+    tdsPpm_ = NAN;
+    if (AppConfig::SERIAL_DEBUG_TEXT) {
+      Serial.println("ADS1220 TDS timeout (check AIN2/AIN3 wiring)");
+    }
+    return;
+  }
+
+  tdsVoltage_ = fabs(v);
+  const float tempC = isnan(temperatureC_) ? 25.0f : temperatureC_;
+  const float compensation =
+      1.0f + AppConfig::TDS_TEMP_COEFFICIENT * (tempC - 25.0f);
+  const float compensatedVoltage =
+      compensation > 0.0f ? tdsVoltage_ / compensation : tdsVoltage_;
+  const float tds = (133.42f * compensatedVoltage * compensatedVoltage *
+                         compensatedVoltage -
+                     255.86f * compensatedVoltage * compensatedVoltage +
+                     857.39f * compensatedVoltage) *
+                    AppConfig::TDS_CALIBRATION_FACTOR;
+  tdsPpm_ = tds < 0.0f ? 0.0f : tds;
+
+  if (AppConfig::SERIAL_DEBUG_TEXT) {
+    Serial.printf("TDS voltage=%.6f V, TDS=%.1f ppm\n", tdsVoltage_, tdsPpm_);
+  }
+}
+
 void SensorSampler::updateTemperature() {
   const uint32_t now = millis();
   if (!tempConversionPending_ &&

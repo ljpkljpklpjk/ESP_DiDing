@@ -25,6 +25,10 @@ class OpticalThermalSampler {
   float bmeHumidityPercent() const { return bmeHumidityPercent_; }
   float bmePressureHpa() const { return bmePressureHpa_; }
   float tofDistanceMm() const { return tofDistanceMm_; }
+  float mlxMaxTempC() const { return mlxMaxTempC_; }
+  float mlxMinTempC() const { return mlxMinTempC_; }
+  float thermalGradientC() const { return thermalGradientC_; }
+  int tofConfidence() const { return tofConfidence_; }
   float absorbanceAu() const { return absorbanceAu_; }
   float concentration() const { return concentration_; }
 
@@ -49,10 +53,14 @@ class OpticalThermalSampler {
   uint32_t lastTofSampleMs_ = 0;
   uint32_t lastColorTimeMs_ = 0;
   float mlxAverageTempC_ = NAN;
+  float mlxMaxTempC_ = NAN;
+  float mlxMinTempC_ = NAN;
+  float thermalGradientC_ = NAN;
   float bmeTemperatureC_ = NAN;
   float bmeHumidityPercent_ = NAN;
   float bmePressureHpa_ = NAN;
   float tofDistanceMm_ = NAN;
+  int tofConfidence_ = 0;
   float absorbanceAu_ = NAN;
   float concentration_ = NAN;
   uint16_t spectrum_[12] = {};

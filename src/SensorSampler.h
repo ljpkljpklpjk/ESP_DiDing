@@ -20,6 +20,7 @@ class SensorSampler {
   float temperatureC() const { return temperatureC_; }
   float tdsVoltage() const { return tdsVoltage_; }
   float tdsPpm() const { return tdsPpm_; }
+  float tdsSlopeMgLMin() const { return tdsSlopeMgLMin_; }
   bool ds18b20Ready() const { return ds18b20Ready_; }
 
  private:
@@ -36,5 +37,8 @@ class SensorSampler {
   float temperatureC_ = NAN;
   float tdsVoltage_ = NAN;
   float tdsPpm_ = NAN;
+  float lastTdsPpm_ = NAN;
+  uint32_t lastTdsRateMs_ = 0;
+  float tdsSlopeMgLMin_ = NAN;
   bool ds18b20Ready_ = false;
 };

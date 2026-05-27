@@ -17,7 +17,22 @@ from telemetry_logger import TelemetryLogger
 
 
 class TitratorQtApp(QMainWindow):
-    def __init__(self, worker, project_dir: Path, log_dir: Path | None = None, run_id: str | None = None):
+    def __init__(
+        self,
+        worker,
+        project_dir: Path,
+        log_dir: Path | None = None,
+        run_id: str | None = None,
+        group: str | None = None,
+        repeat: int | None = None,
+        control_mode: str = "normal_dosing",
+        target_ph_low: float | None = 6.8,
+        target_ph_high: float | None = 7.2,
+        target_tds_mg_l: float | None = 350.0,
+        target_concentration_mg_l: float | None = 8.0,
+        duration_s: int | None = None,
+        sample_interval_s: int = 1,
+    ):
         super().__init__()
         self.worker = worker
         self.rx_queue = worker.rx_queue
@@ -27,7 +42,20 @@ class TitratorQtApp(QMainWindow):
         self.ota_start_time = 0.0
         self.ota_last_output_time = 0.0
         self.pending_telemetry = None
-        self.telemetry_logger = TelemetryLogger(project_dir, log_dir=log_dir, run_id=run_id)
+        self.telemetry_logger = TelemetryLogger(
+            project_dir,
+            log_dir=log_dir,
+            run_id=run_id,
+            group=group,
+            repeat=repeat,
+            control_mode=control_mode,
+            target_ph_low=target_ph_low,
+            target_ph_high=target_ph_high,
+            target_tds_mg_l=target_tds_mg_l,
+            target_concentration_mg_l=target_concentration_mg_l,
+            duration_s=duration_s,
+            sample_interval_s=sample_interval_s,
+        )
 
         self.setWindowTitle("ESP32 自动滴定仪上位机")
         self.resize(1024, 640)
@@ -271,6 +299,7 @@ class TitratorQtApp(QMainWindow):
             return
         self.log_serial("RX " + json.dumps(msg, ensure_ascii=False))
         if msg_type == "boot":
+            self.telemetry_logger.write_boot(msg)
             self.status_label.setText("ESP32 已启动")
             if "slider" in msg:
                 self.control_page.update_slider(msg["slider"])
@@ -291,9 +320,11 @@ class TitratorQtApp(QMainWindow):
             return True
         telemetry_keys = (
             "ph", "pH", "voltage", "voltage_v", "temperature_c", "temp_c",
-            "tds_ppm", "tds_voltage", "tof_distance_mm", "bme280_temperature_c",
+            "tds_ppm", "tds_voltage", "tds_slope_mg_l_min", "tof_distance_mm",
+            "tof_confidence", "bme280_temperature_c",
             "bme280_humidity_percent", "bme280_pressure_hpa", "absorbance_au",
-            "concentration", "flow_ml_min", "dosing_volume_ml",
+            "concentration", "flow_ml_min", "dosing_volume_ml", "thermal_max_c",
+            "thermal_min_c", "thermal_gradient_c",
             "pwm1_percent", "pump_percent", "as7341_intensity",
             "mlx90640_avg_temp_c", "slider", "wifi_connected", "ota_ready",
         )

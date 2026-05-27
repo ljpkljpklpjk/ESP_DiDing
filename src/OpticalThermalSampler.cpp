@@ -57,10 +57,21 @@ void OpticalThermalSampler::updateMlx() {
   }
 
   float sum = 0.0f;
+  float minTemp = frame[0];
+  float maxTemp = frame[0];
   for (int i = 0; i < 32 * 24; ++i) {
     sum += frame[i];
+    if (frame[i] < minTemp) {
+      minTemp = frame[i];
+    }
+    if (frame[i] > maxTemp) {
+      maxTemp = frame[i];
+    }
   }
   mlxAverageTempC_ = sum / static_cast<float>(32 * 24);
+  mlxMinTempC_ = minTemp;
+  mlxMaxTempC_ = maxTemp;
+  thermalGradientC_ = maxTemp - minTemp;
 }
 
 void OpticalThermalSampler::updateAs7341() {
@@ -121,9 +132,11 @@ void OpticalThermalSampler::updateTof() {
   tof_.rangingTest(&measure, false);
   if (measure.RangeStatus == 4) {
     tofDistanceMm_ = NAN;
+    tofConfidence_ = 0;
     return;
   }
   tofDistanceMm_ = measure.RangeMilliMeter;
+  tofConfidence_ = 100;
 }
 
 void OpticalThermalSampler::updateDerivedColorMetrics() {
@@ -153,10 +166,15 @@ void OpticalThermalSampler::addTelemetry(JsonDocument &doc) const {
   doc["bme280_ok"] = bme280Ready_;
   doc["tof_ok"] = tofReady_;
   SerialProtocol::setFloatOrNull(doc, "mlx90640_avg_temp_c", mlxAverageTempC_);
+  SerialProtocol::setFloatOrNull(doc, "thermal_avg_c", mlxAverageTempC_);
+  SerialProtocol::setFloatOrNull(doc, "thermal_max_c", mlxMaxTempC_);
+  SerialProtocol::setFloatOrNull(doc, "thermal_min_c", mlxMinTempC_);
+  SerialProtocol::setFloatOrNull(doc, "thermal_gradient_c", thermalGradientC_);
   SerialProtocol::setFloatOrNull(doc, "bme280_temperature_c", bmeTemperatureC_);
   SerialProtocol::setFloatOrNull(doc, "bme280_humidity_percent", bmeHumidityPercent_);
   SerialProtocol::setFloatOrNull(doc, "bme280_pressure_hpa", bmePressureHpa_);
   SerialProtocol::setFloatOrNull(doc, "tof_distance_mm", tofDistanceMm_);
+  doc["tof_confidence"] = tofConfidence_;
   doc["as7341_intensity"] = colorIntensity_;
   SerialProtocol::setFloatOrNull(doc, "as7341_rate", colorRate_);
   SerialProtocol::setFloatOrNull(doc, "absorbance_au", absorbanceAu_);

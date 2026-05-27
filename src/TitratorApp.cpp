@@ -29,8 +29,15 @@ void TitratorApp::begin() {
   JsonDocument boot;
   boot["type"] = "boot";
   boot["ok"] = true;
+  boot["version"] = "code_v2_paper_dataset";
+  boot["ads"] = true;
   boot["ds18b20_ok"] = dsReady;
+  boot["ds18b20"] = dsReady;
   boot["optical_thermal_ok"] = opticalReady;
+  boot["mlx90640"] = opticalThermal_.mlxReady();
+  boot["as7341"] = opticalThermal_.as7341Ready();
+  boot["bme280"] = opticalThermal_.bme280Ready();
+  boot["tof"] = opticalThermal_.tofReady();
   slider_.addTelemetry(boot);
   serial_.sendJson(boot);
   startTasks();

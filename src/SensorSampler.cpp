@@ -69,7 +69,14 @@ void SensorSampler::updateTds() {
                      255.86f * compensatedVoltage * compensatedVoltage +
                      857.39f * compensatedVoltage) *
                     AppConfig::TDS_CALIBRATION_FACTOR;
-  tdsPpm_ = tds < 0.0f ? 0.0f : tds;
+  const float newTdsPpm = tds < 0.0f ? 0.0f : tds;
+  if (!isnan(lastTdsPpm_) && lastTdsRateMs_ > 0 && now > lastTdsRateMs_) {
+    tdsSlopeMgLMin_ =
+        (newTdsPpm - lastTdsPpm_) * 60000.0f / static_cast<float>(now - lastTdsRateMs_);
+  }
+  lastTdsPpm_ = newTdsPpm;
+  lastTdsRateMs_ = now;
+  tdsPpm_ = newTdsPpm;
 
   if (AppConfig::SERIAL_DEBUG_TEXT) {
     Serial.printf("TDS voltage=%.6f V, TDS=%.1f ppm\n", tdsVoltage_, tdsPpm_);

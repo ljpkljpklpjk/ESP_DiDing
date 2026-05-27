@@ -70,10 +70,16 @@ python3.12 raspberry_pi/titrator_gui.py --port /dev/ttyUSB0 --project-dir ~/didi
 ~/diding/data_logs/paper_dataset/serial_jsonl/<run_id>.jsonl
 ```
 
-CSV 表头兼容旧论文数据集 `closed_loop/run_g1_01.csv`，JSONL 包含原始遥测并补充 `sensor` 嵌套字段。需要保存到指定目录时可以传入：
+CSV 表头兼容旧论文数据集 `closed_loop/run_g1_01.csv`，JSONL 第一行会写入 `boot`，遥测行使用 `version=code_v2_paper_dataset`，并补充 `sensor` 嵌套字段。`run_id` 使用 `run_g1_01` 这类格式时会自动推断 `group=G1`、`repeat=1`。需要保存到指定目录时可以传入：
 
 ```bash
-python3.12 raspberry_pi/titrator_gui.py --project-dir ~/diding --log-dir ~/diding/data_logs/paper_dataset --run-id run_test_01
+python3.12 raspberry_pi/titrator_gui.py --project-dir ~/diding --log-dir ~/diding/data_logs/paper_dataset --run-id run_g1_01
+```
+
+也可以显式指定论文数据集元数据：
+
+```bash
+python3.12 raspberry_pi/titrator_gui.py --project-dir ~/diding --log-dir ~/diding/data_logs/paper_dataset --run-id run_g1_01 --group G1 --repeat 1 --control-mode normal_dosing --target-ph-low 6.8 --target-ph-high 7.2 --target-tds-mg-l 350 --target-concentration-mg-l 8 --duration-s 1800
 ```
 
 ESP32 端默认 RS485 引脚：

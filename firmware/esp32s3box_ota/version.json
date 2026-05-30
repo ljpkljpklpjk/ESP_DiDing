@@ -1,8 +1,8 @@
 {
-  "version": "v2026.05.30.1",
+  "version": "v2026.05.30.2",
   "environment": "esp32s3box_ota",
   "filename": "firmware.bin",
-  "size_bytes": 848672,
-  "built_at": "2026-05-30T22:03:10+08:00",
-  "description": "ESP32 OTA 固件，上电首行直接输出 telemetry JSON，移除启动 OK/boot 输出"
+  "size_bytes": 848704,
+  "built_at": "2026-05-30T22:26:57+08:00",
+  "description": "ESP32 OTA 固件，修复 ADS1220 寄存器读写命令、PGA bypass、DRDY 上拉和转换超时，恢复 pH/TDS 电压读取"
 }

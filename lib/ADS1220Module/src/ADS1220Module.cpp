@@ -6,7 +6,7 @@ ADS1220Module::ADS1220Module(SPIClass& spi, const ADS1220Pins& pins)
 void ADS1220Module::begin() {
   pinMode(pins_.cs, OUTPUT);
   digitalWrite(pins_.cs, HIGH);
-  pinMode(pins_.drdy, INPUT);
+  pinMode(pins_.drdy, INPUT_PULLUP);
 
   spi_.begin(pins_.sclk, pins_.miso, pins_.mosi, -1);
   delay(10);
@@ -14,16 +14,17 @@ void ADS1220Module::begin() {
   sendCommand(ADS_CMD_RESET);
   delay(2);
 
-  // Minimal deterministic init: MUX=AIN0-AIN1, gain=1, PGA enabled.
-  writeRegister(0, 0x00);
+  // Ground-referenced pH/TDS inputs need the PGA bypassed. Use 90 SPS so
+  // single-shot conversions finish well within the normal read timeout.
+  writeRegister(0, AIN0_AIN1 | ADS_REG0_PGA_BYPASS);
+  writeRegister(1, ADS_REG1_DR_90SPS);
   delay(2);
 }
 
 uint8_t ADS1220Module::readRegister(uint8_t reg) {
   spi_.beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE1));
   digitalWrite(pins_.cs, LOW);
-  spi_.transfer((uint8_t)(ADS_CMD_RREG_BASE | (reg & 0x03)));
-  spi_.transfer(0x00);
+  spi_.transfer(registerCommand(ADS_CMD_RREG_BASE, reg, 1));
   uint8_t v = spi_.transfer(0x00);
   digitalWrite(pins_.cs, HIGH);
   spi_.endTransaction();
@@ -31,7 +32,7 @@ uint8_t ADS1220Module::readRegister(uint8_t reg) {
 }
 
 float ADS1220Module::readVoltage(uint8_t muxSetting, uint32_t timeoutMs) {
-  writeRegister(0, muxSetting);
+  writeRegister(0, muxSetting | ADS_REG0_PGA_BYPASS);
 
   sendCommand(ADS_CMD_START_SYNC);
   if (!waitDrdyLow(timeoutMs)) {
@@ -72,11 +73,14 @@ void ADS1220Module::sendCommand(uint8_t cmd) {
 void ADS1220Module::writeRegister(uint8_t reg, uint8_t value) {
   spi_.beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE1));
   digitalWrite(pins_.cs, LOW);
-  spi_.transfer((uint8_t)(ADS_CMD_WREG_BASE | (reg & 0x03)));
-  spi_.transfer(0x00);
+  spi_.transfer(registerCommand(ADS_CMD_WREG_BASE, reg, 1));
   spi_.transfer(value);
   digitalWrite(pins_.cs, HIGH);
   spi_.endTransaction();
+}
+
+uint8_t ADS1220Module::registerCommand(uint8_t base, uint8_t reg, uint8_t count) {
+  return base | ((reg & 0x03) << 2) | ((count - 1) & 0x03);
 }
 
 int32_t ADS1220Module::read24() {

@@ -311,6 +311,26 @@ class TitratorQtApp(QMainWindow):
             self.status_label.setText(f"错误: {msg.get('code', msg.get('message', '--'))}")
         elif msg_type == "serial_error":
             self.status_label.setText(f"串口错误: {msg.get('message', '--')}")
+        elif msg_type == "ota":
+            event = msg.get("event", "--")
+            code = msg.get("code")
+            detail = self.ota_error_text(code) if event == "error" else event
+            text = f"ESP32 OTA: {detail}"
+            self.status_label.setText(text)
+            append_log(self.update_page.log, text, max_lines=800)
+
+    @staticmethod
+    def ota_error_text(code):
+        errors = {
+            0: "认证失败，请检查 OTA 密码",
+            1: "开始写入失败，常见原因是当前固件没有 OTA 分区或 OTA 分区空间不足",
+            2: "连接失败，请检查 WiFi 和 IP",
+            3: "接收固件失败，常见原因是 WiFi 不稳定或上传中断",
+            4: "结束写入失败，常见原因是固件校验失败或写入未完成",
+        }
+        if code is None:
+            return "错误"
+        return f"{errors.get(code, '错误')} (code={code})"
 
     @staticmethod
     def is_telemetry_message(msg):

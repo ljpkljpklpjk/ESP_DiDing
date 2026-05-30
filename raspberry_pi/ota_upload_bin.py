@@ -13,6 +13,12 @@ FLASH = 0
 AUTH = 200
 CHUNK_SIZE = 1024
 
+OTA_HINTS = (
+    "可能原因：ESP32 在写入 OTA 时主动断开连接。",
+    "请检查：1) 下位机串口日志里的 type=ota/error code；2) ESP32 与上位机是否在同一 WiFi 且信号稳定；",
+    "3) 当前 USB 首次烧录的固件是否使用带 OTA 槽的分区表；4) OTA 密码是否为固件里的 AppConfig::OTA_PASSWORD。",
+)
+
 
 def file_md5(path: Path) -> str:
     digest = hashlib.md5()
@@ -64,7 +70,16 @@ def send_invitation(host: str, port: int, message: str, timeout: int, password: 
     return False
 
 
-def upload_firmware(host: str, esp_port: int, local_host: str, local_port: int, password: str, firmware_path: Path, timeout: int) -> int:
+def print_transfer_error(message: str, sent: int, size: int, last_response: str = ""):
+    percent = int(sent * 100 / size) if size else 0
+    print(f"{message}，已发送 {sent}/{size} bytes ({percent}%)", file=sys.stderr, flush=True)
+    if last_response:
+        print(f"ESP32 最后响应: {last_response}", file=sys.stderr, flush=True)
+    for hint in OTA_HINTS:
+        print(hint, file=sys.stderr, flush=True)
+
+
+def upload_firmware(host: str, esp_port: int, local_host: str, local_port: int, password: str, firmware_path: Path, timeout: int, chunk_size: int) -> int:
     firmware_path = firmware_path.expanduser().resolve()
     if not firmware_path.exists():
         print(f"未找到固件文件: {firmware_path}", file=sys.stderr, flush=True)
@@ -102,11 +117,18 @@ def upload_firmware(host: str, esp_port: int, local_host: str, local_port: int, 
             try:
                 with firmware_path.open("rb") as firmware:
                     while True:
-                        chunk = firmware.read(CHUNK_SIZE)
+                        chunk = firmware.read(chunk_size)
                         if not chunk:
                             break
                         conn.sendall(chunk)
-                        last_response = conn.recv(16).decode(errors="replace").strip()
+                        response = conn.recv(16)
+                        if not response:
+                            print_transfer_error("OTA 上传连接已被 ESP32 关闭", sent, size, last_response)
+                            return 1
+                        last_response = response.decode(errors="replace").strip()
+                        if last_response.startswith("ERROR"):
+                            print_transfer_error(f"ESP32 返回 OTA 错误: {last_response}", sent, size, last_response)
+                            return 1
                         sent += len(chunk)
                         percent = int(sent * 100 / size)
                         if percent != last_percent and (percent % 5 == 0 or percent == 100):
@@ -114,6 +136,12 @@ def upload_firmware(host: str, esp_port: int, local_host: str, local_port: int, 
                             last_percent = percent
             except socket.timeout:
                 print("OTA 上传超时", file=sys.stderr, flush=True)
+                return 1
+            except (BrokenPipeError, ConnectionResetError) as exc:
+                print_transfer_error(f"OTA 上传连接被 ESP32 中断: {exc}", sent, size, last_response)
+                return 1
+            except OSError as exc:
+                print_transfer_error(f"OTA 上传网络错误: {exc}", sent, size, last_response)
                 return 1
 
             print("OTA 上传完成，等待 ESP32 写入结果...", flush=True)
@@ -140,6 +168,7 @@ def main() -> int:
     parser.add_argument("--local-host", default="0.0.0.0", help="Local bind address")
     parser.add_argument("--local-port", type=int, default=0, help="Local TCP upload port, 0 means random")
     parser.add_argument("--timeout", type=int, default=10, help="Network timeout seconds")
+    parser.add_argument("--chunk-size", type=int, default=CHUNK_SIZE, help="TCP upload chunk size bytes")
     args = parser.parse_args()
 
     local_port = args.local_port or random.randint(10000, 60000)
@@ -151,6 +180,7 @@ def main() -> int:
         password=args.password,
         firmware_path=Path(args.file),
         timeout=args.timeout,
+        chunk_size=max(256, args.chunk_size),
     )
 
 

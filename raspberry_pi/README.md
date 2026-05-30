@@ -70,7 +70,7 @@ python3.12 raspberry_pi/titrator_gui.py --port /dev/ttyUSB0 --project-dir ~/didi
 ~/diding/data_logs/paper_dataset/serial_jsonl/<run_id>.jsonl
 ```
 
-CSV 表头兼容旧论文数据集 `closed_loop/run_g1_01.csv`，JSONL 第一行会写入 `boot`，遥测行使用 `version=code_v2_paper_dataset`，并补充 `sensor` 嵌套字段。`run_id` 使用 `run_g1_01` 这类格式时会自动推断 `group=G1`、`repeat=1`。需要保存到指定目录时可以传入：
+CSV 表头兼容旧论文数据集 `closed_loop/run_g1_01.csv`，JSONL 会从 ESP32 上电后的首行 `telemetry` 开始记录，遥测行使用 `version=code_v2_paper_dataset`，并补充 `sensor` 嵌套字段。`run_id` 使用 `run_g1_01` 这类格式时会自动推断 `group=G1`、`repeat=1`。需要保存到指定目录时可以传入：
 
 ```bash
 python3.12 raspberry_pi/titrator_gui.py --project-dir ~/diding --log-dir ~/diding/data_logs/paper_dataset --run-id run_g1_01
@@ -93,7 +93,7 @@ RS485 A         -> SH800 RS485 A
 RS485 B         -> SH800 RS485 B
 ```
 
-ESP32 上电后会先连续输出约 3 秒 `OK`，用于确认 RS485 发送链路。看到 `OK` 后，才会进入正常 JSON Lines 遥测。
+ESP32 上电后不再输出裸 `OK` 检测字符串。初始化完成后，首行会直接输出 `telemetry` JSON，之后进入正常 JSON Lines 遥测。
 
 如果串口没有权限，把当前用户加入 `dialout` 组后重新登录：
 

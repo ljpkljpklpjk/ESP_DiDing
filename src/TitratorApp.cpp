@@ -7,11 +7,6 @@
 
 void TitratorApp::begin() {
   serial_.begin();
-  const uint32_t bootOkStartMs = millis();
-  while (millis() - bootOkStartMs < AppConfig::COMM_BOOT_OK_DURATION_MS) {
-    serial_.sendTextLine("OK");
-    delay(AppConfig::COMM_BOOT_OK_INTERVAL_MS);
-  }
 
   slider_.begin();
 
@@ -22,24 +17,15 @@ void TitratorApp::begin() {
     }
   }
 
-  const bool dsReady = sensors_.begin();
-  const bool opticalReady = opticalThermal_.begin();
+  sensors_.begin();
+  opticalThermal_.begin();
   network_.begin(emergencyStopCallback, otaStatusCallback, this);
 
-  JsonDocument boot;
-  boot["type"] = "boot";
-  boot["ok"] = true;
-  boot["version"] = "code_v2_paper_dataset";
-  boot["ads"] = true;
-  boot["ds18b20_ok"] = dsReady;
-  boot["ds18b20"] = dsReady;
-  boot["optical_thermal_ok"] = opticalReady;
-  boot["mlx90640"] = opticalThermal_.mlxReady();
-  boot["as7341"] = opticalThermal_.as7341Ready();
-  boot["bme280"] = opticalThermal_.bme280Ready();
-  boot["tof"] = opticalThermal_.tofReady();
-  slider_.addTelemetry(boot);
-  serial_.sendJson(boot);
+  sensors_.updatePh();
+  sensors_.updateTds();
+  sensors_.updateTemperature();
+  opticalThermal_.update();
+  sendTelemetry();
   startTasks();
 }
 

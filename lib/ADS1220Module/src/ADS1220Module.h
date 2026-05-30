@@ -23,7 +23,7 @@ class ADS1220Module {
  public:
   enum MuxChannel : uint8_t {
     AIN0_AIN1 = 0x00,
-    AIN2_AIN3 = 0x30,
+    AIN2_AIN3 = 0x50,
   };
 
   ADS1220Module(SPIClass& spi, const ADS1220Pins& pins);
@@ -58,5 +58,5 @@ class ADS1220Module {
   static uint8_t registerCommand(uint8_t base, uint8_t reg, uint8_t count);
   void writeRegister(uint8_t reg, uint8_t value);
   int32_t read24();
-  bool waitDrdyLow(uint32_t timeoutMs) const;
+  bool waitConversionReady(uint32_t timeoutMs) const;
 };

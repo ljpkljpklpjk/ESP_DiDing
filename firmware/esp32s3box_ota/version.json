@@ -1,8 +1,8 @@
 {
-  "version": "v2026.05.30.2",
+  "version": "v2026.05.30.3",
   "environment": "esp32s3box_ota",
   "filename": "firmware.bin",
-  "size_bytes": 848704,
-  "built_at": "2026-05-30T22:26:57+08:00",
-  "description": "ESP32 OTA 固件，修复 ADS1220 寄存器读写命令、PGA bypass、DRDY 上拉和转换超时，恢复 pH/TDS 电压读取"
+  "size_bytes": 848720,
+  "built_at": "2026-05-30T22:45:04+08:00",
+  "description": "ESP32 OTA 固件，修正 ADS1220 DRDY 转换完成等待逻辑和 AIN2-AIN3 MUX 配置，避免读取旧转换值导致电压接近 0"
 }

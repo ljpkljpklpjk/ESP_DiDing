@@ -1,8 +1,8 @@
 {
-  "version": "v2026.05.30.3",
+  "version": "v2026.06.01.1",
   "environment": "esp32s3box_ota",
   "filename": "firmware.bin",
-  "size_bytes": 848720,
-  "built_at": "2026-05-30T22:45:04+08:00",
-  "description": "ESP32 OTA 固件，修正 ADS1220 DRDY 转换完成等待逻辑和 AIN2-AIN3 MUX 配置，避免读取旧转换值导致电压接近 0"
+  "size_bytes": 848752,
+  "built_at": "2026-06-01T16:42:05+08:00",
+  "description": "ESP32 OTA 固件，修正 ADS1220 DRDY 低电平旧 ready 状态导致读数超时的问题，保留 AIN2-AIN3 TDS MUX 配置"
 }

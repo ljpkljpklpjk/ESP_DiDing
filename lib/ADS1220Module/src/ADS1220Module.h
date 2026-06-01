@@ -58,5 +58,6 @@ class ADS1220Module {
   static uint8_t registerCommand(uint8_t base, uint8_t reg, uint8_t count);
   void writeRegister(uint8_t reg, uint8_t value);
   int32_t read24();
-  bool waitConversionReady(uint32_t timeoutMs) const;
+  void clearReadyState();
+  bool waitDrdyLow(uint32_t timeoutMs) const;
 };

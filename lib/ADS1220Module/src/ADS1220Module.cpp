@@ -34,8 +34,9 @@ uint8_t ADS1220Module::readRegister(uint8_t reg) {
 float ADS1220Module::readVoltage(uint8_t muxSetting, uint32_t timeoutMs) {
   writeRegister(0, muxSetting | ADS_REG0_PGA_BYPASS);
 
+  clearReadyState();
   sendCommand(ADS_CMD_START_SYNC);
-  if (!waitConversionReady(timeoutMs)) {
+  if (!waitDrdyLow(timeoutMs)) {
     return NAN;
   }
 
@@ -96,12 +97,14 @@ int32_t ADS1220Module::read24() {
   return ((int32_t)b2 << 16) | ((int32_t)b1 << 8) | (int32_t)b0;
 }
 
-bool ADS1220Module::waitConversionReady(uint32_t timeoutMs) const {
-  uint32_t start = millis();
-  while (digitalRead(pins_.drdy) == LOW) {
-    if (millis() - start > timeoutMs) return false;
-    yield();
+void ADS1220Module::clearReadyState() {
+  if (digitalRead(pins_.drdy) == LOW) {
+    (void)read24();
   }
+}
+
+bool ADS1220Module::waitDrdyLow(uint32_t timeoutMs) const {
+  uint32_t start = millis();
   while (digitalRead(pins_.drdy) == HIGH) {
     if (millis() - start > timeoutMs) return false;
     yield();

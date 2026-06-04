@@ -1,16 +1,16 @@
-# ESP32-S3 自动滴定仪下位机与 SH800 上位机工程
+# ESP32-S3 自动滴定仪下位机与 SH800 / Windows 上位机工程
 
 ## 版本信息
 
 - 版本号：v2026.06.01.1
-- 提交时间：2026-06-01 16:42:05 +0800
-- 更新内容：修正 ADS1220 在 DRDY 已保持低电平时等待 busy 高电平导致读数超时的问题；读取前先清除上一帧 ready 状态，再启动本次 `START/SYNC` 转换，保留 TDS 通道 AIN2-AIN3 的 MUX 配置，并重新生成预编译 OTA 固件。
+- 提交时间：2026-06-04 13:11:31 +0800
+- 更新内容：修正 ADS1220 在 DRDY 已保持低电平时等待 busy 高电平导致读数超时的问题；新增 Windows 版 PySide6 / Qt6 上位机脚本，支持 COM 口自动检测、`netsh wlan` WiFi 管理、Gitee 更新和 OTA 上传；补充 Windows 端 README 与仓库目录说明。
 
 ## 项目概述
 
-本仓库是一个基于 ESP32-S3 和有人 SH800（RK3568，Ubuntu 20.04） 的自动滴定仪测试工程。
+本仓库是一个基于 ESP32-S3、有人 SH800（RK3568，Ubuntu 20.04）和 Windows 管理者电脑的自动滴定仪测试工程。
 
-整体设计分为两部分：
+整体设计分为三部分：
 
 1. **ESP32-S3 下位机**
    - 负责直接连接和控制传感器、执行器。
@@ -27,7 +27,13 @@
    - 提供 WiFi 打开/关闭、连接 WiFi、查看 IP 功能。
    - 提供从 Gitee 检查更新、拉取更新、通过 OTA 更新 ESP32 固件的功能。
 
-当前通信方式为 **串口 JSON Lines**：SH800 上位机按行发送 JSON 控制指令，ESP32-S3 按行回传遥测、确认、完成和错误信息。
+3. **Windows 上位机 / 管理者电脑**
+   - 运行 `windows/titrator_gui.py`，提供与 SH800 端一致的 PySide6 / Qt6 控制界面。
+   - 自动检测 Windows COM 串口，支持手动指定 `COM3`、`COM4` 等端口。
+   - 通过 `netsh wlan` 管理 Windows WiFi 状态，支持 Gitee 更新和 OTA 上传。
+   - 适合在管理者电脑上调试、编译固件、生成预编译 OTA 固件并维护仓库。
+
+当前通信方式为 **串口 JSON Lines**：SH800 或 Windows 上位机按行发送 JSON 控制指令，ESP32-S3 按行回传遥测、确认、完成和错误信息。
 
 ## 当前已支持功能
 
@@ -68,6 +74,7 @@
 - 从 Gitee 拉取最新上位机代码和预编译固件。
 - 直接上传仓库内预编译 `firmware.bin` 到 ESP32。
 - OTA 实时日志显示，包括认证、上传百分比、完成或失败信息。
+- Windows 版上位机支持 COM 口自动检测、`netsh wlan` WiFi 管理和与 SH800 端一致的遥测/控制/OTA 页面。
 
 ## 推荐使用流程总览
 
@@ -76,18 +83,18 @@
 1. 管理者在 Windows 电脑上维护本仓库代码。
 2. 管理者在 Windows 电脑上编译 ESP32 固件。
 3. 管理者把生成好的预编译固件 `firmware/esp32s3box_ota/firmware.bin` 提交并推送到 Gitee/GitHub。
-4. SH800固定从 Gitee 拉取项目更新。
-5. SH800本地屏幕运行 `raspberry_pi/titrator_gui.py`。
-6. 用户在 SH800 界面点击“从 Gitee 更新代码”。
-7. 用户在 SH800 界面点击“更新 ESP32 固件 OTA”。
-8. SH800 直接把仓库里的预编译固件上传给 ESP32，不在 SH800 上编译。
+4. 现场可选择 SH800 或 Windows 上位机运行图形界面。
+5. SH800 本地屏幕运行 `raspberry_pi/titrator_gui.py`；Windows 管理者电脑运行 `windows/titrator_gui.py`。
+6. 用户在上位机界面点击“从 Gitee 更新代码”。
+7. 用户在上位机界面点击“更新 ESP32 固件 OTA”。
+8. 上位机直接把仓库里的预编译固件上传给 ESP32，不在现场机器上编译。
 
 这样做的好处是：
 
-- SH800不需要安装完整 PlatformIO 编译链。
-- SH800不需要访问 GitHub，优先使用 Gitee。
+- SH800 和现场 Windows 上位机都不需要安装完整 PlatformIO 编译链。
+- 现场机器不需要访问 GitHub，优先使用 Gitee。
 - ESP32 不需要暴露到公网，只需要和SH800在同一实验室局域网。
-- 现场更新流程更稳定，适合触摸屏一体化操作。
+- 现场更新流程更稳定，既适合 SH800 触摸屏一体化操作，也适合 Windows 管理者电脑临时调试。
 
 ## 仓库目录说明
 

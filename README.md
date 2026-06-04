@@ -102,10 +102,19 @@
 ├── src/
 │   └── main.cpp                     # ESP32-S3 下位机主程序
 ├── raspberry_pi/
-│   ├── titrator_gui.py              # SH800 PySide6 / Qt6 一体化上位机界面
-│   ├── ota_update.py                # SH800命令行 OTA 入口
+│   ├── titrator_gui.py              # SH800 (Ubuntu) PySide6 / Qt6 上位机入口
+│   ├── qt_app.py                    # SH800 主窗口逻辑
+│   ├── serial_worker.py             # SH800 /dev/tty* 串口检测
+│   ├── system_manager.py           # SH800 nmcli WiFi / Git 管理
+│   ├── ota_update.py                # 命令行 OTA 入口
 │   ├── ota_upload_bin.py            # 不依赖 PlatformIO 的 Python OTA 上传器
 │   └── README.md                    # SH800端说明
+├── windows/
+│   ├── titrator_gui.py              # Windows PySide6 / Qt6 上位机入口
+│   ├── windows_qt_app.py            # Windows 主窗口逻辑
+│   ├── windows_serial_worker.py     # Windows COM 口检测
+│   ├── windows_system_manager.py    # Windows netsh WiFi / Git 管理
+│   └── README.md                    # Windows 端说明
 ├── tools/
 │   └── release_firmware.py          # 管理者电脑生成预编译固件的脚本
 ├── firmware/
@@ -1289,10 +1298,43 @@ cd ~/diding
 python3.12 raspberry_pi/ota_update.py --host 192.168.x.x
 ```
 
+### Windows 安装
+
+```powershell
+# 1. 克隆项目
+git clone -b codex/new_feature https://gitee.com/bidi2004/diding.git
+cd diding
+
+# 2. 安装依赖
+pip install pyserial PySide6
+
+# 3. (可选) 如需 Gitee 更新功能，确保 Git for Windows 在 PATH 中
+```
+
+### Windows 启动 GUI
+
+```powershell
+cd diding
+python windows/titrator_gui.py
+```
+
+手动指定串口：
+
+```powershell
+python windows/titrator_gui.py --port COM3
+python windows/titrator_gui.py --port COM4
+```
+
+> **注意**：Windows 端 WiFi 管理（连接/开关）基于 `netsh wlan`，可能需要**管理员权限**。仅查看遥测和控制滴定无需管理员权限。
+
 ### 检查 Python 文件语法
 
 ```bash
-python -m py_compile raspberry_pi/titrator_gui.py raspberry_pi/ota_update.py raspberry_pi/ota_upload_bin.py tools/release_firmware.py
+# SH800 端
+python -m py_compile raspberry_pi/titrator_gui.py raspberry_pi/qt_app.py raspberry_pi/ota_update.py raspberry_pi/ota_upload_bin.py tools/release_firmware.py
+
+# Windows 端
+python -m py_compile windows/titrator_gui.py windows/windows_qt_app.py windows/windows_serial_worker.py windows/windows_system_manager.py
 ```
 
 ## 当前推荐现场操作步骤

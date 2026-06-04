@@ -1,8 +1,8 @@
 {
-  "version": "v2026.06.01.1",
+  "version": "v2026.05.18.2",
   "environment": "esp32s3box_ota",
   "filename": "firmware.bin",
   "size_bytes": 848752,
-  "built_at": "2026-06-01T16:42:05+08:00",
-  "description": "ESP32 OTA 固件，修正 ADS1220 DRDY 低电平旧 ready 状态导致读数超时的问题，保留 AIN2-AIN3 TDS MUX 配置"
+  "built_at": "2026-06-04T13:11:31+08:00",
+  "description": "预编译 ESP32 OTA 固件"
 }

@@ -1,29 +1,57 @@
 #!/usr/bin/env python3
-"""PySide6 upper-controller UI for the ESP32-S3 titrator lower controller."""
+"""PySide6 upper-controller UI for the ESP32-S3 titrator — Windows edition."""
 
 import argparse
 import queue
 import sys
 from pathlib import Path
 
-from serial_worker import AUTO_PORT, SerialWorker
-from system_manager import DEFAULT_PROJECT_DIR
+
+def _setup_path():
+    """Add raspberry_pi/ to sys.path so shared modules can be imported."""
+    repo_root = Path(__file__).resolve().parents[1]
+    shared = repo_root / "raspberry_pi"
+    if str(shared) not in sys.path:
+        sys.path.insert(0, str(shared))
+    # Also add the windows/ directory itself
+    windows_dir = repo_root / "windows"
+    if str(windows_dir) not in sys.path:
+        sys.path.insert(0, str(windows_dir))
 
 
 def main():
-    parser = argparse.ArgumentParser(description="ESP32 自动滴定仪 SH800/Linux 上位机")
+    _setup_path()
+
+    from windows_serial_worker import AUTO_PORT, SerialWorker
+    from windows_system_manager import DEFAULT_PROJECT_DIR
+
+    parser = argparse.ArgumentParser(description="ESP32 自动滴定仪 Windows 上位机")
     parser.add_argument(
         "--port",
         default=AUTO_PORT,
-        help="ESP32 serial port, or 'auto' to pick SH800 RS485/USB serial automatically",
+        help="ESP32 serial port, or 'auto' to pick COM port automatically",
     )
     parser.add_argument("--baudrate", type=int, default=115200)
-    parser.add_argument("--project-dir", default=str(DEFAULT_PROJECT_DIR), help="Project directory")
-    parser.add_argument("--log-dir", default=None, help="Paper-format data directory")
-    parser.add_argument("--run-id", default=None, help="Run id used for CSV/JSONL filenames")
-    parser.add_argument("--group", default=None, help="Experiment group, for example G1")
-    parser.add_argument("--repeat", type=int, default=None, help="Experiment repeat index")
-    parser.add_argument("--control-mode", default="normal_dosing", help="Control mode written to dataset")
+    parser.add_argument(
+        "--project-dir", default=str(DEFAULT_PROJECT_DIR), help="Project directory"
+    )
+    parser.add_argument(
+        "--log-dir", default=None, help="Paper-format data directory"
+    )
+    parser.add_argument(
+        "--run-id", default=None, help="Run id used for CSV/JSONL filenames"
+    )
+    parser.add_argument(
+        "--group", default=None, help="Experiment group, for example G1"
+    )
+    parser.add_argument(
+        "--repeat", type=int, default=None, help="Experiment repeat index"
+    )
+    parser.add_argument(
+        "--control-mode",
+        default="normal_dosing",
+        help="Control mode written to dataset",
+    )
     parser.add_argument("--target-ph-low", type=float, default=6.8)
     parser.add_argument("--target-ph-high", type=float, default=7.2)
     parser.add_argument("--target-tds-mg-l", type=float, default=350.0)
@@ -35,12 +63,12 @@ def main():
     try:
         from PySide6.QtWidgets import QApplication, QMessageBox
     except ImportError as exc:
-        print("未找到 PySide6。SH800 请先安装 Python 3.12 和 PySide6。", file=sys.stderr)
-        print("示例：python3.12 -m pip install --user pyserial PySide6", file=sys.stderr)
+        print("未找到 PySide6。请先安装依赖：", file=sys.stderr)
+        print("  pip install pyserial PySide6", file=sys.stderr)
         print(str(exc), file=sys.stderr)
         return 1
 
-    from qt_app import TitratorQtApp
+    from windows_qt_app import TitratorQtApp
     from qt_theme import apply_theme
 
     qt_app = QApplication(sys.argv)
@@ -71,7 +99,9 @@ def main():
         sample_interval_s=args.sample_interval_s,
     )
     if worker.resolved_port:
-        window.status_label.setText(f"已连接串口 {worker.resolved_port}，等待 ESP32 遥测...")
+        window.status_label.setText(
+            f"已连接串口 {worker.resolved_port}，等待 ESP32 遥测..."
+        )
     window.show()
     return qt_app.exec()
 

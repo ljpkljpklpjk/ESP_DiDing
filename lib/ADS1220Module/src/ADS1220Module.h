@@ -23,7 +23,7 @@ class ADS1220Module {
  public:
   enum MuxChannel : uint8_t {
     AIN0_AIN1 = 0x00,
-    AIN2_AIN3 = 0x30,
+    AIN2_AIN3 = 0x50,
   };
 
   ADS1220Module(SPIClass& spi, const ADS1220Pins& pins);
@@ -45,6 +45,8 @@ class ADS1220Module {
   static constexpr uint8_t ADS_CMD_RDATA = 0x10;
   static constexpr uint8_t ADS_CMD_RREG_BASE = 0x20;
   static constexpr uint8_t ADS_CMD_WREG_BASE = 0x40;
+  static constexpr uint8_t ADS_REG0_PGA_BYPASS = 0x01;
+  static constexpr uint8_t ADS_REG1_DR_90SPS = 0x40;
 
   SPIClass& spi_;
   ADS1220Pins pins_;
@@ -53,8 +55,9 @@ class ADS1220Module {
   float calTempC_ = 25.0f;
 
   void sendCommand(uint8_t cmd);
+  static uint8_t registerCommand(uint8_t base, uint8_t reg, uint8_t count);
   void writeRegister(uint8_t reg, uint8_t value);
   int32_t read24();
+  void clearReadyState();
   bool waitDrdyLow(uint32_t timeoutMs) const;
 };
-

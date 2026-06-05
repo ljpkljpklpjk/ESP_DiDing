@@ -57,7 +57,8 @@ def _fetch_gitee_with_ttl(mgr, git):
     if _LAST_GIT_FETCH_TIME > 0 and (now - _LAST_GIT_FETCH_TIME) < _GIT_FETCH_TTL:
         return 0, ""
     code, out = mgr._run(
-        [git, "fetch", GITEE_REMOTE, GITEE_BRANCH], cwd=mgr.project_dir
+        [git, "fetch", GITEE_REMOTE, GITEE_BRANCH], cwd=mgr.project_dir,
+        timeout=30,
     )
     if code == 0:
         _LAST_GIT_FETCH_TIME = now
@@ -102,7 +103,7 @@ class WindowsSystemManager:
     # helpers
     # ------------------------------------------------------------------
 
-    def _run(self, cmd, cwd=None):
+    def _run(self, cmd, cwd=None, timeout=None):
         completed = subprocess.run(
             cmd,
             cwd=cwd,
@@ -111,6 +112,7 @@ class WindowsSystemManager:
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             check=False,
+            timeout=timeout,
         )
         return completed.returncode, completed.stdout.strip()
 
@@ -427,18 +429,42 @@ class WindowsSystemManager:
         git = _git_executable()
         if not git:
             return 1, "未找到 git，请安装 Git for Windows"
-        code, out = self.ensure_gitee_remote()
+        if not (self.project_dir / ".git").exists():
+            return 1, f"当前项目路径不是 Git 仓库：{self.project_dir}"
+
+        # Ensure gitee remote exists (lightweight, no fetch)
+        code, remotes = self._run([git, "remote"], cwd=self.project_dir)
         if code != 0:
-            return code, out
-        _, local = self._run([git, "rev-parse", "HEAD"], cwd=self.project_dir)
-        _, remote = self._run(
-            [git, "rev-parse", f"{GITEE_REMOTE}/{GITEE_BRANCH}"],
+            return code, remotes
+        remote_names = set(remotes.split())
+        if GITEE_REMOTE in remote_names:
+            self._run(
+                [git, "remote", "set-url", GITEE_REMOTE, GITEE_REPO_URL],
+                cwd=self.project_dir,
+            )
+        else:
+            code, out = self._run(
+                [git, "remote", "add", GITEE_REMOTE, GITEE_REPO_URL],
+                cwd=self.project_dir,
+            )
+            if code != 0:
+                return code, out
+
+        # Use ls-remote for fast check (single HTTP request, no object download)
+        _, remote_ref = self._run(
+            [git, "ls-remote", GITEE_REMOTE, GITEE_BRANCH],
             cwd=self.project_dir,
+            timeout=15,
         )
-        if local == remote:
+        if not remote_ref:
+            return 1, "无法获取 Gitee 远端信息，请检查网络"
+        remote_sha = remote_ref.split()[0] if remote_ref else ""
+
+        _, local = self._run([git, "rev-parse", "HEAD"], cwd=self.project_dir)
+        if local == remote_sha:
             return 0, "当前已经是 Gitee 最新版本"
         branch = self._current_git_branch() or "游离 HEAD"
-        return 0, f"Gitee 发现新版本：{local[:7]} -> {remote[:7]}，当前分支 {branch}"
+        return 0, f"Gitee 发现新版本：{local[:7]} -> {remote_sha[:7]}，当前分支 {branch}"
 
     def update_project(self):
         git = _git_executable()

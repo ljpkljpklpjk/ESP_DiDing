@@ -104,6 +104,9 @@ class WindowsSystemManager:
     # ------------------------------------------------------------------
 
     def _run(self, cmd, cwd=None, timeout=None):
+        # Prevent git from prompting for credentials (would hang in background thread)
+        env = os.environ.copy()
+        env.setdefault("GIT_TERMINAL_PROMPT", "0")
         completed = subprocess.run(
             cmd,
             cwd=cwd,
@@ -113,6 +116,7 @@ class WindowsSystemManager:
             stderr=subprocess.STDOUT,
             check=False,
             timeout=timeout,
+            env=env,
         )
         return completed.returncode, completed.stdout.strip()
 
@@ -432,8 +436,20 @@ class WindowsSystemManager:
         if not (self.project_dir / ".git").exists():
             return 1, f"当前项目路径不是 Git 仓库：{self.project_dir}"
 
+        # Write diagnostic log to a temp file (stderr invisible when GUI is double-clicked)
+        _diag_log = self.project_dir / "update_check.log"
+        def _diag(msg):
+            try:
+                with open(_diag_log, "a", encoding="utf-8") as f:
+                    f.write(f"{time.strftime('%H:%M:%S')} {msg}\n")
+            except Exception:
+                pass
+        _diag("check_git_update started")
+        _diag(f"git={git} project_dir={self.project_dir}")
+
         # Ensure gitee remote exists (lightweight, no fetch)
         code, remotes = self._run([git, "remote"], cwd=self.project_dir)
+        _diag(f"git remote: code={code} remotes={remotes}")
         if code != 0:
             return code, remotes
         remote_names = set(remotes.split())
@@ -448,22 +464,29 @@ class WindowsSystemManager:
                 cwd=self.project_dir,
             )
             if code != 0:
+                _diag(f"FAIL remote add: {out}")
                 return code, out
 
-        # Use ls-remote for fast check (single HTTP request, no object download)
+        # Use ls-remote with URL directly (bypasses credential-manager quirks)
+        _diag("running ls-remote...")
         _, remote_ref = self._run(
-            [git, "ls-remote", GITEE_REMOTE, GITEE_BRANCH],
+            [git, "ls-remote", GITEE_REPO_URL, f"refs/heads/{GITEE_BRANCH}"],
             cwd=self.project_dir,
-            timeout=15,
+            timeout=30,
         )
+        _diag(f"ls-remote done: {remote_ref!r}")
         if not remote_ref:
+            _diag("FAIL: ls-remote returned empty")
             return 1, "无法获取 Gitee 远端信息，请检查网络"
         remote_sha = remote_ref.split()[0] if remote_ref else ""
 
         _, local = self._run([git, "rev-parse", "HEAD"], cwd=self.project_dir)
+        _diag(f"local={local} remote={remote_sha}")
         if local == remote_sha:
+            _diag("result: up-to-date")
             return 0, "当前已经是 Gitee 最新版本"
         branch = self._current_git_branch() or "游离 HEAD"
+        _diag(f"result: new version available")
         return 0, f"Gitee 发现新版本：{local[:7]} -> {remote_sha[:7]}，当前分支 {branch}"
 
     def update_project(self):

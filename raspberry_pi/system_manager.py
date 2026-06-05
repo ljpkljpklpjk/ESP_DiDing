@@ -1,4 +1,5 @@
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -39,6 +40,9 @@ class LinuxSystemManager:
         self.project_dir = project_dir
 
     def _run(self, cmd, cwd=None, timeout=None):
+        # Prevent git from prompting for credentials (would hang in background thread)
+        env = os.environ.copy()
+        env.setdefault("GIT_TERMINAL_PROMPT", "0")
         completed = subprocess.run(
             cmd,
             cwd=cwd,
@@ -47,6 +51,7 @@ class LinuxSystemManager:
             stderr=subprocess.STDOUT,
             check=False,
             timeout=timeout,
+            env=env,
         )
         return completed.returncode, completed.stdout.strip()
 
@@ -186,12 +191,14 @@ class LinuxSystemManager:
             if code != 0:
                 return code, out
 
-        # Use ls-remote for fast check (single HTTP request, no object download)
+        # Use ls-remote with URL directly (bypasses credential-manager quirks)
+        print("[check_git_update] running ls-remote...", file=sys.stderr, flush=True)
         _, remote_ref = self._run(
-            ["git", "ls-remote", GITEE_REMOTE, GITEE_BRANCH],
+            ["git", "ls-remote", GITEE_REPO_URL, f"refs/heads/{GITEE_BRANCH}"],
             cwd=self.project_dir,
-            timeout=15,
+            timeout=30,
         )
+        print(f"[check_git_update] ls-remote result: {remote_ref!r}", file=sys.stderr, flush=True)
         if not remote_ref:
             return 1, "无法获取 Gitee 远端信息，请检查网络"
         remote_sha = remote_ref.split()[0] if remote_ref else ""

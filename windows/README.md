@@ -37,7 +37,19 @@ pip install pyserial PySide6
 
 Windows 端“检查 Gitee 更新”和“从 Gitee 更新代码”默认使用 `https://gitee.com/bidi2004/diding.git` 的 `codex/new_feature` 分支。
 
-点击“从 Gitee 更新代码”时，程序会先确认或切换到 `codex/new_feature`，再执行 fast-forward 更新。若当前分支有未提交的跟踪文件改动，程序会停止切换并提示先提交或备份本地修改，避免覆盖现场改动。
+### 检查更新（约 1 秒）
+
+- 使用 `git ls-remote` 直连 URL，仅获取远端最新 commit SHA，**不下载任何 Git 对象**。
+- 10 秒内重复点击自动跳过网络请求（TTL 机制），无需等待。
+- 超时保护：15~30 秒无响应自动报错，不会无限卡死。
+- 若遇到问题，查看项目目录下的 `update_check.log` 诊断日志。
+
+### 更新代码
+
+- 点击“从 Gitee 更新代码”时，程序会先确认或切换到 `codex/new_feature`，再执行 `git merge --ff-only`。
+- 若当前分支有未提交的改动，程序会停止切换并提示先提交或备份，避免覆盖现场修改。
+- 后台子进程自动设置 `GIT_TERMINAL_PROMPT=0`，不会弹出凭据窗口卡死 GUI。
+
 
 ## 运行
 

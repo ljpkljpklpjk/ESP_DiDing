@@ -127,7 +127,13 @@ python3.12 -m pip install --user PySide6
 
 “检查 Gitee 更新”和“从 Gitee 更新代码”依赖 `git`，推荐当前项目目录为 `~/diding`，并使用 Gitee 仓库 `https://gitee.com/bidi2004/diding.git` 的 `codex/new_feature` 分支作为更新源。
 
+- “检查 Gitee 更新”使用 `git ls-remote`（约 1 秒），不下载 Git 对象。
+- “从 Gitee 更新代码”使用 `git pull --ff-only`，需实际下载对象。
+- 10 秒内重复点击“检查更新”自动跳过网络请求。
+- 后台 git 子进程自动设置 `GIT_TERMINAL_PROMPT=0`，不会弹出凭据提示卡死界面。
+
 “更新 ESP32 下位机固件 OTA”会在界面内上传仓库里的预编译固件，不需要在 SH800 上安装 PlatformIO 或现场编译。ESP32 IP 会优先从下位机遥测里的 `ip` 字段自动填入，也可以手动修改。OTA 执行时“系统更新”页会实时显示固件版本、连接、认证、上传百分比、完成或失败状态。
+
 
 ## SH800 中转 OTA 更新
 

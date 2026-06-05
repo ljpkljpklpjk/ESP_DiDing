@@ -2,9 +2,26 @@
 
 ## 版本信息
 
-- 版本号：v2026.06.05.1
-- 提交时间：2026-06-05 10:54:49 +0800
-- 更新内容：修复 Windows 上位机无法从 Gitee 更新的问题；Windows 端更新功能会自动定位 Git for Windows、对齐 `codex/new_feature` 更新分支，并在存在未提交改动时停止切换以保护本地修改；同步补充 Windows README。
+- 版本号：v2026.06.18.1
+- 提交时间：2026-06-18
+- 更新内容：
+
+  1. **性能优化：Git 更新检查大幅提速**
+     - `check_git_update()` 改用 `git ls-remote`（单次 HTTP 请求，仅获取远端 commit SHA，不下载 Git 对象），速度从数倍 `git fetch` 提升到约 1 秒。
+     - 去掉重复的 `git fetch`（原来 `ensure_gitee_remote` 和 `check_git_update` 各执行一次）。
+     - Windows 端缓存 `git.exe` 路径，避免每次重复扫描文件系统。
+     - 10 秒内重复点击检查更新自动跳过网络请求（TTL 机制）。
+
+  2. **网络超时保护**
+     - `_run()` 添加可选 `timeout` 参数，`git fetch` 30 秒超时，`git ls-remote` 30 秒超时，防止网络不通时无限卡死。
+
+  3. **修复后台线程卡死（关键 bug）**
+     - 设置 `GIT_TERMINAL_PROMPT=0` 防止 git 子进程在后台线程弹出凭据管理器导致挂起。
+     - Windows 端 `check_git_update()` 写入 `update_check.log` 诊断日志，方便排查。
+
+  4. **修复 GUI 状态不更新（关键 bug）**
+     - `SystemTask` 的 `TaskSignals` 因提前被 GC 导致 `finished` 信号丢弃，GUI 永远卡在…中。
+     - 修复：`self._pending_tasks` 保持 task 引用直到信号被主线程处理完毕。
 
 ## 项目概述
 
@@ -957,12 +974,28 @@ https://github.com/ljpkljpklpjk/ESP_DiDing.git
 codex/new_feature
 ```
 
-SH800 GUI 中的“检查 Gitee 更新”和“从 Gitee 更新代码”默认使用：
+上位机（SH800 / Windows）中的“检查 Gitee 更新”和“从 Gitee 更新代码”默认使用：
 
 ```text
 远程名：gitee
 仓库：https://gitee.com/bidi2004/diding.git
 分支：codex/new_feature
+```
+
+- “检查 Gitee 更新”使用 `git ls-remote`（仅获取远端 commit SHA，约 1 秒），不下载 Git 对象。
+- “从 Gitee 更新代码”使用 `git fetch` + merge（需要实际下载对象）。
+- 10 秒内重复点击“检查更新”自动跳过网络请求（TTL 机制）。
+- 若当前分支有未提交改动，更新前会停止并提示，避免覆盖本地修改。
+
+### GitHub 合并到 main 分支
+
+开发分支 `codex/new_feature` 的新 commit 可以合并到 `main`：
+
+```bash
+git checkout main
+git merge codex/new_feature
+git push origin main        # 推送到 GitHub
+git push gitee main          # 同时推送到 Gitee
 ```
 
 ## 串口手动测试方法

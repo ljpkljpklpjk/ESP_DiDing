@@ -121,8 +121,13 @@ class TitratorQtApp(QMainWindow):
     def run_system_task(self, label, func, on_done):
         on_done(f"{label}中...")
         task = SystemTask(func)
+        # Keep task alive until signal is delivered (prevents GC of TaskSignals)
+        if not hasattr(self, '_pending_tasks'):
+            self._pending_tasks = set()
+        self._pending_tasks.add(task)
 
         def finish(code, output):
+            self._pending_tasks.discard(task)
             prefix = "完成" if code == 0 else "失败"
             on_done(f"{label}{prefix}: {output or '无输出'}")
 

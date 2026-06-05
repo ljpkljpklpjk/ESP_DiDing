@@ -192,13 +192,11 @@ class LinuxSystemManager:
                 return code, out
 
         # Use ls-remote with URL directly (bypasses credential-manager quirks)
-        print("[check_git_update] running ls-remote...", file=sys.stderr, flush=True)
         _, remote_ref = self._run(
             ["git", "ls-remote", GITEE_REPO_URL, f"refs/heads/{GITEE_BRANCH}"],
             cwd=self.project_dir,
             timeout=30,
         )
-        print(f"[check_git_update] ls-remote result: {remote_ref!r}", file=sys.stderr, flush=True)
         if not remote_ref:
             return 1, "无法获取 Gitee 远端信息，请检查网络"
         remote_sha = remote_ref.split()[0] if remote_ref else ""

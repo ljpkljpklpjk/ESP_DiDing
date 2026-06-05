@@ -2,6 +2,7 @@ import json
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 
@@ -13,6 +14,23 @@ FIRMWARE_VERSION_RELATIVE_PATH = Path("firmware/esp32s3box_ota/version.json")
 GITEE_REPO_URL = "https://gitee.com/bidi2004/diding.git"
 GITEE_BRANCH = "codex/new_feature"
 GITEE_REMOTE = "gitee"
+
+_LAST_GIT_FETCH_TIME: float = 0.0
+_GIT_FETCH_TTL: float = 10.0  # seconds
+
+
+def _fetch_gitee_with_ttl(mgr):
+    """Fetch gitee remote but skip if last fetch was within TTL seconds."""
+    global _LAST_GIT_FETCH_TIME
+    now = time.time()
+    if _LAST_GIT_FETCH_TIME > 0 and (now - _LAST_GIT_FETCH_TIME) < _GIT_FETCH_TTL:
+        return 0, ""
+    code, out = mgr._run(
+        ["git", "fetch", GITEE_REMOTE, GITEE_BRANCH], cwd=mgr.project_dir
+    )
+    if code == 0:
+        _LAST_GIT_FETCH_TIME = now
+    return code, out
 
 
 class LinuxSystemManager:
@@ -141,15 +159,17 @@ class LinuxSystemManager:
         if code != 0:
             return code, out
 
-        self._run(["git", "fetch", GITEE_REMOTE, GITEE_BRANCH], cwd=self.project_dir)
+        code, out = _fetch_gitee_with_ttl(self)
+        if code != 0:
+            return code, out
+
         self._run(["git", "branch", "--set-upstream-to", f"{GITEE_REMOTE}/{GITEE_BRANCH}", GITEE_BRANCH], cwd=self.project_dir)
         return 0, f"已设置 Gitee 更新源：{GITEE_REPO_URL} 分支 {GITEE_BRANCH}"
 
     def check_git_update(self):
         if not shutil.which("git"):
             return 1, "未找到 git"
-        self.ensure_gitee_remote()
-        code, out = self._run(["git", "fetch", GITEE_REMOTE, GITEE_BRANCH], cwd=self.project_dir)
+        code, out = self.ensure_gitee_remote()
         if code != 0:
             return code, out
         _, local = self._run(["git", "rev-parse", "HEAD"], cwd=self.project_dir)

@@ -4,6 +4,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 
@@ -17,12 +18,21 @@ GITEE_BRANCH = "codex/new_feature"
 GITEE_REMOTE = "gitee"
 
 _WIFI_INTERFACE_CACHE = None
+_GIT_EXECUTABLE_CACHE: str | None = None
+_LAST_GIT_FETCH_TIME: float = 0.0
+_GIT_FETCH_TTL: float = 10.0  # seconds
 
 
 def _git_executable() -> str | None:
+    global _GIT_EXECUTABLE_CACHE
+    if _GIT_EXECUTABLE_CACHE is not None:
+        return _GIT_EXECUTABLE_CACHE
+
     git = shutil.which("git")
     if git:
+        _GIT_EXECUTABLE_CACHE = git
         return git
+
     candidates = []
     for env_name, suffix in (
         ("ProgramFiles", Path("Git") / "cmd" / "git.exe"),
@@ -34,8 +44,24 @@ def _git_executable() -> str | None:
             candidates.append(Path(base) / suffix)
     for candidate in candidates:
         if candidate.exists():
-            return str(candidate)
+            _GIT_EXECUTABLE_CACHE = str(candidate)
+            return _GIT_EXECUTABLE_CACHE
+
     return None
+
+
+def _fetch_gitee_with_ttl(mgr, git):
+    """Fetch gitee remote but skip if last fetch was within TTL seconds."""
+    global _LAST_GIT_FETCH_TIME
+    now = time.time()
+    if _LAST_GIT_FETCH_TIME > 0 and (now - _LAST_GIT_FETCH_TIME) < _GIT_FETCH_TTL:
+        return 0, ""
+    code, out = mgr._run(
+        [git, "fetch", GITEE_REMOTE, GITEE_BRANCH], cwd=mgr.project_dir
+    )
+    if code == 0:
+        _LAST_GIT_FETCH_TIME = now
+    return code, out
 
 
 def _wifi_interface_name() -> str | None:
@@ -311,9 +337,7 @@ class WindowsSystemManager:
         if code != 0:
             return code, out
 
-        code, out = self._run(
-            [git, "fetch", GITEE_REMOTE, GITEE_BRANCH], cwd=self.project_dir
-        )
+        code, out = _fetch_gitee_with_ttl(self, git)
         if code != 0:
             return code, out
 
@@ -404,11 +428,6 @@ class WindowsSystemManager:
         if not git:
             return 1, "未找到 git，请安装 Git for Windows"
         code, out = self.ensure_gitee_remote()
-        if code != 0:
-            return code, out
-        code, out = self._run(
-            [git, "fetch", GITEE_REMOTE, GITEE_BRANCH], cwd=self.project_dir
-        )
         if code != 0:
             return code, out
         _, local = self._run([git, "rev-parse", "HEAD"], cwd=self.project_dir)

@@ -2,9 +2,9 @@
 
 ## 版本信息
 
-- 版本号：v2026.06.01.1
-- 提交时间：2026-06-04 13:11:31 +0800
-- 更新内容：修正 ADS1220 在 DRDY 已保持低电平时等待 busy 高电平导致读数超时的问题；新增 Windows 版 PySide6 / Qt6 上位机脚本，支持 COM 口自动检测、`netsh wlan` WiFi 管理、Gitee 更新和 OTA 上传；补充 Windows 端 README 与仓库目录说明。
+- 版本号：v2026.06.05.1
+- 提交时间：2026-06-05 10:54:49 +0800
+- 更新内容：修复 Windows 上位机无法从 Gitee 更新的问题；Windows 端更新功能会自动定位 Git for Windows、对齐 `codex/new_feature` 更新分支，并在存在未提交改动时停止切换以保护本地修改；同步补充 Windows README。
 
 ## 项目概述
 
@@ -31,6 +31,7 @@
    - 运行 `windows/titrator_gui.py`，提供与 SH800 端一致的 PySide6 / Qt6 控制界面。
    - 自动检测 Windows COM 串口，支持手动指定 `COM3`、`COM4` 等端口。
    - 通过 `netsh wlan` 管理 Windows WiFi 状态，支持 Gitee 更新和 OTA 上传。
+   - Windows 端 Gitee 更新默认对齐 `codex/new_feature` 分支，可自动使用常见安装路径下的 Git for Windows。
    - 适合在管理者电脑上调试、编译固件、生成预编译 OTA 固件并维护仓库。
 
 当前通信方式为 **串口 JSON Lines**：SH800 或 Windows 上位机按行发送 JSON 控制指令，ESP32-S3 按行回传遥测、确认、完成和错误信息。
@@ -1315,7 +1316,8 @@ cd diding
 # 2. 安装依赖
 pip install pyserial PySide6
 
-# 3. (可选) 如需 Gitee 更新功能，确保 Git for Windows 在 PATH 中
+# 3. (可选) 如需 Gitee 更新功能，安装 Git for Windows
+#    GUI 会优先使用 PATH 中的 git，也会尝试常见安装路径
 ```
 
 ### Windows 启动 GUI

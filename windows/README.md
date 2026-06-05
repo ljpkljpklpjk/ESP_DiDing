@@ -23,14 +23,21 @@
 
 ```powershell
 # 1. 克隆项目
-git clone https://gitee.com/bidi2004/diding.git
+git clone -b codex/new_feature https://gitee.com/bidi2004/diding.git
 cd diding
 
 # 2. 安装 Python 依赖
 pip install pyserial PySide6
 
-# 3. (可选) 如需 Gitee 更新功能，确保 git 在 PATH 中
+# 3. (可选) 如需 Gitee 更新功能，安装 Git for Windows
+#    GUI 会优先使用 PATH 中的 git，也会尝试常见安装路径
 ```
+
+## Gitee 更新
+
+Windows 端“检查 Gitee 更新”和“从 Gitee 更新代码”默认使用 `https://gitee.com/bidi2004/diding.git` 的 `codex/new_feature` 分支。
+
+点击“从 Gitee 更新代码”时，程序会先确认或切换到 `codex/new_feature`，再执行 fast-forward 更新。若当前分支有未提交的跟踪文件改动，程序会停止切换并提示先提交或备份本地修改，避免覆盖现场改动。
 
 ## 运行
 

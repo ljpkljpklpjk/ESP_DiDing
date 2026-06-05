@@ -19,6 +19,25 @@ GITEE_REMOTE = "gitee"
 _WIFI_INTERFACE_CACHE = None
 
 
+def _git_executable() -> str | None:
+    git = shutil.which("git")
+    if git:
+        return git
+    candidates = []
+    for env_name, suffix in (
+        ("ProgramFiles", Path("Git") / "cmd" / "git.exe"),
+        ("ProgramFiles(x86)", Path("Git") / "cmd" / "git.exe"),
+        ("LocalAppData", Path("Programs") / "Git" / "cmd" / "git.exe"),
+    ):
+        base = os.environ.get(env_name)
+        if base:
+            candidates.append(Path(base) / suffix)
+    for candidate in candidates:
+        if candidate.exists():
+            return str(candidate)
+    return None
+
+
 def _wifi_interface_name() -> str | None:
     """Detect the primary Wi-Fi interface name (e.g. 'Wi-Fi' or 'WLAN')."""
     global _WIFI_INTERFACE_CACHE
@@ -268,35 +287,109 @@ class WindowsSystemManager:
     # ------------------------------------------------------------------
 
     def ensure_gitee_remote(self):
-        if not shutil.which("git"):
+        git = _git_executable()
+        if not git:
             return 1, "未找到 git，请安装 Git for Windows"
         if not (self.project_dir / ".git").exists():
             return 1, f"当前项目路径不是 Git 仓库：{self.project_dir}"
 
-        code, remotes = self._run(["git", "remote"], cwd=self.project_dir)
+        code, remotes = self._run([git, "remote"], cwd=self.project_dir)
         if code != 0:
             return code, remotes
 
         remote_names = set(remotes.split())
         if GITEE_REMOTE in remote_names:
             code, out = self._run(
-                ["git", "remote", "set-url", GITEE_REMOTE, GITEE_REPO_URL],
+                [git, "remote", "set-url", GITEE_REMOTE, GITEE_REPO_URL],
                 cwd=self.project_dir,
             )
         else:
             code, out = self._run(
-                ["git", "remote", "add", GITEE_REMOTE, GITEE_REPO_URL],
+                [git, "remote", "add", GITEE_REMOTE, GITEE_REPO_URL],
                 cwd=self.project_dir,
             )
         if code != 0:
             return code, out
 
-        self._run(
-            ["git", "fetch", GITEE_REMOTE, GITEE_BRANCH], cwd=self.project_dir
+        code, out = self._run(
+            [git, "fetch", GITEE_REMOTE, GITEE_BRANCH], cwd=self.project_dir
         )
+        if code != 0:
+            return code, out
+
+        local_branch_exists, _ = self._run(
+            [git, "rev-parse", "--verify", "--quiet", f"refs/heads/{GITEE_BRANCH}"],
+            cwd=self.project_dir,
+        )
+        if local_branch_exists == 0:
+            self._run(
+                [
+                    git,
+                    "branch",
+                    "--set-upstream-to",
+                    f"{GITEE_REMOTE}/{GITEE_BRANCH}",
+                    GITEE_BRANCH,
+                ],
+                cwd=self.project_dir,
+            )
+        return 0, f"已设置 Gitee 更新源：{GITEE_REPO_URL} 分支 {GITEE_BRANCH}"
+
+    def _current_git_branch(self):
+        git = _git_executable()
+        if not git:
+            return ""
+        code, out = self._run(
+            [git, "branch", "--show-current"], cwd=self.project_dir
+        )
+        return out.strip() if code == 0 else ""
+
+    def _has_tracked_changes(self):
+        git = _git_executable()
+        if not git:
+            return True
+        unstaged, _ = self._run([git, "diff", "--quiet"], cwd=self.project_dir)
+        staged, _ = self._run(
+            [git, "diff", "--cached", "--quiet"], cwd=self.project_dir
+        )
+        return unstaged != 0 or staged != 0
+
+    def _checkout_update_branch(self):
+        git = _git_executable()
+        if not git:
+            return 1, "未找到 git，请安装 Git for Windows"
+
+        current = self._current_git_branch()
+        if current == GITEE_BRANCH:
+            return 0, ""
+
+        if self._has_tracked_changes():
+            return (
+                1,
+                "当前分支有未提交改动，无法自动切换到更新分支；请先提交或备份本地修改",
+            )
+
+        code, _ = self._run(
+            [git, "rev-parse", "--verify", "--quiet", f"refs/heads/{GITEE_BRANCH}"],
+            cwd=self.project_dir,
+        )
+        if code == 0:
+            code, out = self._run([git, "checkout", GITEE_BRANCH], cwd=self.project_dir)
+        else:
+            code, out = self._run(
+                [
+                    git,
+                    "checkout",
+                    "-B",
+                    GITEE_BRANCH,
+                    f"{GITEE_REMOTE}/{GITEE_BRANCH}",
+                ],
+                cwd=self.project_dir,
+            )
+        if code != 0:
+            return code, out
         self._run(
             [
-                "git",
+                git,
                 "branch",
                 "--set-upstream-to",
                 f"{GITEE_REMOTE}/{GITEE_BRANCH}",
@@ -304,34 +397,42 @@ class WindowsSystemManager:
             ],
             cwd=self.project_dir,
         )
-        return 0, f"已设置 Gitee 更新源：{GITEE_REPO_URL} 分支 {GITEE_BRANCH}"
+        return 0, f"已切换到更新分支 {GITEE_BRANCH}"
 
     def check_git_update(self):
-        if not shutil.which("git"):
-            return 1, "未找到 git"
-        self.ensure_gitee_remote()
+        git = _git_executable()
+        if not git:
+            return 1, "未找到 git，请安装 Git for Windows"
+        code, out = self.ensure_gitee_remote()
+        if code != 0:
+            return code, out
         code, out = self._run(
-            ["git", "fetch", GITEE_REMOTE, GITEE_BRANCH], cwd=self.project_dir
+            [git, "fetch", GITEE_REMOTE, GITEE_BRANCH], cwd=self.project_dir
         )
         if code != 0:
             return code, out
-        _, local = self._run(["git", "rev-parse", "HEAD"], cwd=self.project_dir)
+        _, local = self._run([git, "rev-parse", "HEAD"], cwd=self.project_dir)
         _, remote = self._run(
-            ["git", "rev-parse", f"{GITEE_REMOTE}/{GITEE_BRANCH}"],
+            [git, "rev-parse", f"{GITEE_REMOTE}/{GITEE_BRANCH}"],
             cwd=self.project_dir,
         )
         if local == remote:
             return 0, "当前已经是 Gitee 最新版本"
-        return 0, f"Gitee 发现新版本：{local[:7]} -> {remote[:7]}"
+        branch = self._current_git_branch() or "游离 HEAD"
+        return 0, f"Gitee 发现新版本：{local[:7]} -> {remote[:7]}，当前分支 {branch}"
 
     def update_project(self):
-        if not shutil.which("git"):
-            return 1, "未找到 git"
+        git = _git_executable()
+        if not git:
+            return 1, "未找到 git，请安装 Git for Windows"
         code, out = self.ensure_gitee_remote()
         if code != 0:
             return code, out
+        code, out = self._checkout_update_branch()
+        if code != 0:
+            return code, out
         return self._run(
-            ["git", "pull", "--ff-only", GITEE_REMOTE, GITEE_BRANCH],
+            [git, "merge", "--ff-only", f"{GITEE_REMOTE}/{GITEE_BRANCH}"],
             cwd=self.project_dir,
         )
 

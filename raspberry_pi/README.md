@@ -154,10 +154,10 @@ firmware/esp32s3box_ota/firmware.bin
 管理者在电脑上更新该固件文件：
 
 ```bash
-python tools/release_firmware.py --project-dir D:/galgame/ESP_DiDing_codex_new_feature
+python tools/release_firmware.py --project-dir D:/galgame/ESP_DiDing_codex_new_feature --version vYYYY.MM.DD.N
 ```
 
-之后提交并推送到 Gitee。SH800 点击“从 Gitee 更新代码”即可拉到最新预编译固件。
+请把 `vYYYY.MM.DD.N` 替换为本次发布版本号；缺少 `--version` 时脚本会直接退出，不会更新版本信息。之后提交并推送到 Gitee。SH800 点击“从 Gitee 更新代码”即可拉到最新预编译固件。
 
 也可以在 SH800 终端手动执行：
 

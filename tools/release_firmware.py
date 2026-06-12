@@ -9,7 +9,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 DEFAULT_ENV = "esp32s3box_ota"
-DEFAULT_VERSION = "v2026.05.18.2"
 
 
 def default_project_dir() -> Path:
@@ -33,10 +32,13 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Build ESP32 OTA firmware.bin and copy it to firmware/ for release.")
     parser.add_argument("--project-dir", default=str(default_project_dir()), help="PlatformIO project directory")
     parser.add_argument("--env", default=DEFAULT_ENV, help="PlatformIO environment")
-    parser.add_argument("--version", default=DEFAULT_VERSION, help="Firmware version recorded in version.json")
+    parser.add_argument("--version", required=True, help="Required firmware version recorded in version.json")
     parser.add_argument("--description", default="预编译 ESP32 OTA 固件", help="Firmware description")
     parser.add_argument("--platformio", default=None, help="Path to platformio executable")
     args = parser.parse_args()
+    args.version = args.version.strip()
+    if not args.version:
+        parser.error("--version must not be empty")
 
     project_dir = Path(args.project_dir).expanduser().resolve()
     platformio = find_platformio(args.platformio)

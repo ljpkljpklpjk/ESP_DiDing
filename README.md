@@ -658,7 +658,7 @@ SH800现场不推荐编译 ESP32 固件。推荐由管理者电脑生成预编�
 在 Windows 管理者电脑执行：
 
 ```bash
-python D:/galgame/ESP_DiDing_codex_new_feature/tools/release_firmware.py --project-dir D:/galgame/ESP_DiDing_codex_new_feature
+python D:/galgame/ESP_DiDing_codex_new_feature/tools/release_firmware.py --project-dir D:/galgame/ESP_DiDing_codex_new_feature --version vYYYY.MM.DD.N
 ```
 
 脚本会执行：
@@ -667,6 +667,8 @@ python D:/galgame/ESP_DiDing_codex_new_feature/tools/release_firmware.py --proje
 2. 从 `.pio/build/esp32s3box_ota/firmware.bin` 复制固件。
 3. 写入仓库发布目录。
 4. 生成固件版本信息。
+
+`--version` 必须显式指定，请把 `vYYYY.MM.DD.N` 替换为本次发布版本号；缺少版本号时脚本会直接退出，不会写入 `firmware/esp32s3box_ota/version.json`。
 
 输出文件：
 
@@ -678,7 +680,7 @@ firmware/esp32s3box_ota/version.json
 ### 指定固件版本和说明
 
 ```bash
-python D:/galgame/ESP_DiDing_codex_new_feature/tools/release_firmware.py --project-dir D:/galgame/ESP_DiDing_codex_new_feature --version v2026.05.16.x --description "这里写本次固件说明"
+python D:/galgame/ESP_DiDing_codex_new_feature/tools/release_firmware.py --project-dir D:/galgame/ESP_DiDing_codex_new_feature --version vYYYY.MM.DD.N --description "这里写本次固件说明"
 ```
 
 ### 提交固件
@@ -1228,7 +1230,7 @@ git remote add gitee https://gitee.com/bidi2004/diding.git 2>/dev/null || git re
 则提交前应该：
 
 1. 编译 ESP32 固件。
-2. 运行 `tools/release_firmware.py` 生成新的 `firmware.bin`。
+2. 运行 `tools/release_firmware.py --version vYYYY.MM.DD.N` 生成新的 `firmware.bin`。
 3. 更新 README 版本信息。
 4. 提交源码和预编译固件。
 5. 推送到 Gitee/GitHub。
@@ -1305,7 +1307,7 @@ C:/Users/MI/.platformio/penv/Scripts/platformio.exe run -d D:/galgame/ESP_DiDing
 ### Windows 生成预编译 OTA 固件
 
 ```bash
-python D:/galgame/ESP_DiDing_codex_new_feature/tools/release_firmware.py --project-dir D:/galgame/ESP_DiDing_codex_new_feature
+python D:/galgame/ESP_DiDing_codex_new_feature/tools/release_firmware.py --project-dir D:/galgame/ESP_DiDing_codex_new_feature --version vYYYY.MM.DD.N
 ```
 
 ### SH800首次克隆

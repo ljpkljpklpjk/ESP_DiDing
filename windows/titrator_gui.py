@@ -58,6 +58,12 @@ def main():
     parser.add_argument("--target-concentration-mg-l", type=float, default=8.0)
     parser.add_argument("--duration-s", type=int, default=None)
     parser.add_argument("--sample-interval-s", type=int, default=1)
+    parser.add_argument(
+        "--tcp-port",
+        type=int,
+        default=0,
+        help="TCP relay port for LAN telemetry forwarding (0 = disabled)",
+    )
     args = parser.parse_args()
 
     try:
@@ -97,6 +103,7 @@ def main():
         target_concentration_mg_l=args.target_concentration_mg_l,
         duration_s=args.duration_s,
         sample_interval_s=args.sample_interval_s,
+        tcp_port=args.tcp_port,
     )
     if worker.resolved_port:
         window.status_label.setText(

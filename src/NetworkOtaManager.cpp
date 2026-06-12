@@ -1,6 +1,7 @@
 #include "NetworkOtaManager.h"
 
 #include <ArduinoOTA.h>
+#include <Preferences.h>
 #include <WiFi.h>
 
 #include "AppConfig.h"
@@ -17,9 +18,11 @@ void NetworkOtaManager::begin(Callback emergencyStop,
   context_ = context;
   gNetworkOtaInstance = this;
 
+  loadCredentials();
+
   WiFi.mode(WIFI_STA);
   WiFi.setAutoReconnect(true);
-  WiFi.begin(AppConfig::WIFI_SSID, AppConfig::WIFI_PASSWORD);
+  startWifi();
 
   ArduinoOTA.setHostname(AppConfig::OTA_HOSTNAME);
   ArduinoOTA.setPassword(AppConfig::OTA_PASSWORD);
@@ -71,7 +74,17 @@ void NetworkOtaManager::updateWifi() {
   }
   lastWifiRetryMs_ = now;
   WiFi.disconnect();
-  WiFi.begin(AppConfig::WIFI_SSID, AppConfig::WIFI_PASSWORD);
+  startWifi();
+}
+
+void NetworkOtaManager::connectToWifi(const char *ssid, const char *password) {
+  saveCredentials(ssid, password);
+  ssid_ = ssid;
+  password_ = password;
+
+  WiFi.disconnect();
+  delay(100);
+  startWifi();
 }
 
 bool NetworkOtaManager::wifiConnected() const {
@@ -80,4 +93,37 @@ bool NetworkOtaManager::wifiConnected() const {
 
 String NetworkOtaManager::ipText() const {
   return wifiConnected() ? WiFi.localIP().toString() : "";
+}
+
+String NetworkOtaManager::ssid() const {
+  return wifiConnected() ? WiFi.SSID() : ssid_;
+}
+
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
+
+void NetworkOtaManager::loadCredentials() {
+  Preferences prefs;
+  if (!prefs.begin(AppConfig::WIFI_NVS_NAMESPACE, true)) {
+    // NVS partition not available — use compile-time defaults
+    ssid_ = AppConfig::WIFI_SSID;
+    password_ = AppConfig::WIFI_PASSWORD;
+    return;
+  }
+  ssid_ = prefs.getString("ssid", AppConfig::WIFI_SSID);
+  password_ = prefs.getString("pass", AppConfig::WIFI_PASSWORD);
+  prefs.end();
+}
+
+void NetworkOtaManager::saveCredentials(const char *ssid, const char *password) {
+  Preferences prefs;
+  prefs.begin(AppConfig::WIFI_NVS_NAMESPACE, false);
+  prefs.putString("ssid", ssid);
+  prefs.putString("pass", password);
+  prefs.end();
+}
+
+void NetworkOtaManager::startWifi() {
+  WiFi.begin(ssid_.c_str(), password_.c_str());
 }

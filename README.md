@@ -2,26 +2,25 @@
 
 ## 版本信息
 
-- 版本号：v2026.06.05.1
-- 提交时间：2026-06-05
+- 版本号：v2026.06.12.1
+- 提交时间：2026-06-12
 - 更新内容：
 
-  1. **性能优化：Git 更新检查大幅提速**
-     - `check_git_update()` 改用 `git ls-remote`（单次 HTTP 请求，仅获取远端 commit SHA，不下载 Git 对象），速度从数倍 `git fetch` 提升到约 1 秒。
-     - 去掉重复的 `git fetch`（原来 `ensure_gitee_remote` 和 `check_git_update` 各执行一次）。
-     - Windows 端缓存 `git.exe` 路径，避免每次重复扫描文件系统。
-     - 10 秒内重复点击检查更新自动跳过网络请求（TTL 机制）。
+  1. **ESP32 动态 WiFi 凭证 + NVS 持久化**
+     - 上位机可通过 `wifi_connect` 命令让 ESP32 切换 WiFi。
+     - ESP32 使用 Preferences/NVS 记住最后一次连接的 WiFi（SSID + 密码）。
+     - 重启后自动加载持久化凭证，找不到时回退到编译期默认 `Lab807_2.4G`。
+     - 遥测新增 `wifi_ssid` 字段，上位机可实时显示 ESP32 当前连接的 WiFi 名称。
 
-  2. **网络超时保护**
-     - `_run()` 添加可选 `timeout` 参数，`git fetch` 30 秒超时，`git ls-remote` 30 秒超时，防止网络不通时无限卡死。
+  2. **上位机局域网 TCP 遥测转发**
+     - 新增 `raspberry_pi/tcp_server.py`：上位机作为 TCP Server，将 ESP32 遥测 JSON 广播给局域网内其他系统。
+     - 通过 `--tcp-port 9000` 启动，默认禁用（不影响现有串口通信）。
+     - 其他系统只需 TCP 连接 `<上位机IP>:9000` 即可接收 JSON Lines 遥测流。
 
-  3. **修复后台线程卡死（关键 bug）**
-     - 设置 `GIT_TERMINAL_PROMPT=0` 防止 git 子进程在后台线程弹出凭据管理器导致挂起。
-     - Windows 端 `check_git_update()` 写入 `update_check.log` 诊断日志，方便排查。
-
-  4. **修复 GUI 状态不更新（关键 bug）**
-     - `SystemTask` 的 `TaskSignals` 因提前被 GC 导致 `finished` 信号丢弃，GUI 永远卡在…中。
-     - 修复：`self._pending_tasks` 保持 task 引用直到信号被主线程处理完毕。
+  3. **网络设置页重构**
+     - 拆分为"ESP32 下位机 WiFi"和"SH800 上位机 WiFi"两个独立面板。
+     - ESP32 面板：输入 SSID/密码 → 通过串口命令切换 ESP32 WiFi，状态实时刷新。
+     - 上位机面板：保持原有 SH800/Windows WiFi 管理功能不变。
 
 ## 项目概述
 
@@ -74,6 +73,8 @@
 - 串口 JSON Lines 通信。
 - WiFi 自动连接。
 - ArduinoOTA 远程固件更新。
+- 通过串口 `wifi_connect` 命令远程切换 ESP32 WiFi。
+- ESP32 WiFi 名称和连接状态同步显示。
 - OTA 开始前自动急停。
 - 运动期间优化任务调度，减少丝杆滑台卡顿。
 
@@ -131,6 +132,7 @@
 │   ├── qt_app.py                    # SH800 主窗口逻辑
 │   ├── serial_worker.py             # SH800 /dev/tty* 串口检测
 │   ├── system_manager.py           # SH800 nmcli WiFi / Git 管理
+│   ├── tcp_server.py               # TCP 遥测转发服务器（局域网广播 JSON）
 │   ├── ota_update.py                # 命令行 OTA 入口
 │   ├── ota_upload_bin.py            # 不依赖 PlatformIO 的 Python OTA 上传器
 │   └── README.md                    # SH800端说明
@@ -906,7 +908,17 @@ python3.12 -c "from PySide6.QtWidgets import QApplication; print('PySide6 ok')"
 
 ### 网络设置页
 
-该页面用于管理SH800自身 WiFi。
+该页面分为"ESP32 下位机 WiFi"和"SH800 上位机 WiFi"两个面板。
+
+**ESP32 下位机 WiFi 面板：**
+
+- 显示 ESP32 当前连接 WiFi 名称和 IP。
+- 输入 SSID 和密码，通过串口发送 `wifi_connect` 命令切换 ESP32 WiFi。
+- ESP32 将凭证保存到 NVS，重启后自动连接最后一次的 WiFi。
+
+**SH800 上位机 WiFi 面板：**
+
+该面板用于管理SH800自身 WiFi。
 
 功能包括：
 
@@ -1326,6 +1338,12 @@ cd ~/diding
 python3.12 raspberry_pi/titrator_gui.py --project-dir ~/diding
 ```
 
+启动时开启 TCP 遥测转发（端口 9000）：
+
+```bash
+python3.12 raspberry_pi/titrator_gui.py --tcp-port 9000
+```
+
 手动指定串口：
 
 ```bash
@@ -1360,6 +1378,12 @@ pip install pyserial PySide6
 ```powershell
 cd diding
 python windows/titrator_gui.py
+```
+
+启动时开启 TCP 遥测转发（端口 9000）：
+
+```powershell
+python windows/titrator_gui.py --tcp-port 9000
 ```
 
 手动指定串口：

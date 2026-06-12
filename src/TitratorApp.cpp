@@ -280,6 +280,19 @@ void TitratorApp::handleCommand(JsonDocument &doc) {
     return;
   }
 
+  if (strcmp(cmd, "wifi_connect") == 0) {
+    const char *ssid = doc["ssid"] | "";
+    const char *password = doc["password"] | "";
+    if (strlen(ssid) == 0) {
+      serial_.sendError("missing_ssid", id);
+      return;
+    }
+    network_.connectToWifi(ssid, password);
+    sendAck(id);
+    sendTelemetry();
+    return;
+  }
+
   if (doc["pwm1_percent"].is<float>() || doc["pwm1_percent"].is<int>()) {
     outputs_.setPwm1Percent(doc["pwm1_percent"].as<float>());
   }

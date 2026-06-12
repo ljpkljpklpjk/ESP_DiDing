@@ -78,6 +78,7 @@ static constexpr float PUMP_MAX_FLOW_ML_MIN = 100.0f;
 
 static constexpr const char *WIFI_SSID = "Lab807_2.4G";
 static constexpr const char *WIFI_PASSWORD = "lab80700";
+static constexpr const char *WIFI_NVS_NAMESPACE = "wifi_cfg";
 static constexpr const char *OTA_HOSTNAME = "esp-diding";
 static constexpr const char *OTA_PASSWORD = "lab80700";
 

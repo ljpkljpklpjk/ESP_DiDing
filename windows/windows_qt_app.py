@@ -12,8 +12,9 @@ from qt_pages.network_page import NetworkPage
 from qt_pages.update_page import UpdatePage
 from qt_widgets import append_log, make_button
 from qt_workers import OtaTask, SystemTask, thread_pool
-from windows_system_manager import DEFAULT_OTA_PASSWORD, WindowsSystemManager
+from tcp_server import TcpRelayServer
 from telemetry_logger import TelemetryLogger
+from windows_system_manager import DEFAULT_OTA_PASSWORD, WindowsSystemManager
 
 
 class TitratorQtApp(QMainWindow):
@@ -34,6 +35,7 @@ class TitratorQtApp(QMainWindow):
         target_concentration_mg_l: float | None = 8.0,
         duration_s: int | None = None,
         sample_interval_s: int = 1,
+        tcp_port: int = 0,
     ):
         super().__init__()
         self.worker = worker
@@ -44,6 +46,10 @@ class TitratorQtApp(QMainWindow):
         self.ota_start_time = 0.0
         self.ota_last_output_time = 0.0
         self.pending_telemetry = None
+        self._tcp_server: TcpRelayServer | None = None
+        if tcp_port > 0:
+            self._tcp_server = TcpRelayServer(port=tcp_port)
+            self._tcp_server.start()
         self.telemetry_logger = TelemetryLogger(
             project_dir,
             log_dir=log_dir,
@@ -110,6 +116,10 @@ class TitratorQtApp(QMainWindow):
         self.ota_heartbeat_timer.timeout.connect(self.update_ota_heartbeat)
 
         self.refresh_wifi_status()
+        if self._tcp_server:
+            self.status_label.setText(
+                f"{self.status_label.text()} | TCP :{self._tcp_server.port}"
+            )
 
     def next_id(self):
         cid = self.command_id
@@ -185,6 +195,13 @@ class TitratorQtApp(QMainWindow):
 
     def reset_dose(self):
         self.send_cmd("reset_dose")
+
+    def connect_esp32_wifi(self, ssid, password):
+        if not ssid.strip():
+            QMessageBox.warning(self, "ESP32 WiFi", "请输入 SSID")
+            return
+        self.send_cmd("wifi_connect", ssid=ssid.strip(), password=password)
+        self.network_page.set_esp32_status(f"正在连接 {ssid.strip()}...")
 
     def refresh_wifi_status(self):
         self.run_system_task(
@@ -407,9 +424,17 @@ class TitratorQtApp(QMainWindow):
 
     def update_telemetry(self, msg):
         ip = first_value(msg, "ip", "esp32_ip")
+        ssid = msg.get("wifi_ssid", "")
+        wifi_connected = msg.get("wifi_connected", False)
         if ip:
             self.ip_label.setText(f"ESP32 IP: {ip}")
             self.update_page.set_esp32_ip(ip)
+        if wifi_connected and ssid:
+            self.network_page.set_esp32_status(f"已连接 {ssid}  IP: {ip}")
+        elif ssid:
+            self.network_page.set_esp32_status(f"正在连接 {ssid}...")
+        elif not wifi_connected:
+            self.network_page.set_esp32_status(f"未连接  IP: {ip or '--'}")
         self.control_page.update_telemetry(msg)
 
     def flush_telemetry(self):
@@ -420,11 +445,15 @@ class TitratorQtApp(QMainWindow):
         self.log_serial("RX " + json.dumps(msg, ensure_ascii=False))
         self.telemetry_logger.write(msg)
         self.update_telemetry(msg)
+        if self._tcp_server and self._tcp_server.client_count > 0:
+            self._tcp_server.broadcast(msg)
 
     def log_serial(self, text):
         append_log(self.control_page.log, text)
 
     def closeEvent(self, event):
+        if self._tcp_server:
+            self._tcp_server.stop()
         self.worker.stop()
         self.telemetry_logger.close()
         event.accept()

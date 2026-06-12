@@ -25,6 +25,7 @@ void buildTelemetry(JsonDocument &doc, const SensorSampler &sensors,
   SerialProtocol::setFloatOrNull(doc, "flow_ml_min", outputs.flowMlPerMin());
   SerialProtocol::setFloatOrNull(doc, "dosing_volume_ml", outputs.dosingVolumeMl());
   doc["wifi_connected"] = network.wifiConnected();
+  doc["wifi_ssid"] = network.ssid();
   doc["ip"] = network.ipText();
   doc["ota_ready"] = network.otaReady();
   slider.addTelemetry(doc);

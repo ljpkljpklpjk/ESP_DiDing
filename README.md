@@ -2,20 +2,23 @@
 
 ## 版本信息
 
-- 版本号：v2026.06.12.1
-- 提交时间：2026-06-12
+- 版本号：v2026.06.19.1
+- 提交时间：2026-06-19
 - 更新内容：
 
-  1. **ESP32 动态 WiFi 凭证 + NVS 持久化**
+  1. **上位机远程 HTTP 遥测上传**
+     - 新增 `raspberry_pi/http_uploader.py`：上位机通过 HTTP POST 将遥测 JSON 发送到团队远程服务器。
+     - 通过 `--server-url http://公网IP` 启动，默认不启用（不影响现有串口通信和本地日志存储）。
+     - 上传路径为 `/api/devices/titrator/telemetry`，使用 Python 内置 `urllib` 无额外依赖。
+     - 非阻塞上传：内部队列 + 后台线程，不阻塞 GUI 界面。
+     - 上传间隔 5 秒，避免请求过于频繁。
+     - 界面右上角新增圆形指示灯：绿色闪烁 = 上传成功，红色常亮 = 上传失败。
+
+  2. **ESP32 动态 WiFi 凭证 + NVS 持久化**
      - 上位机可通过 `wifi_connect` 命令让 ESP32 切换 WiFi。
      - ESP32 使用 Preferences/NVS 记住最后一次连接的 WiFi（SSID + 密码）。
      - 重启后自动加载持久化凭证，找不到时回退到编译期默认 `Lab807_2.4G`。
      - 遥测新增 `wifi_ssid` 字段，上位机可实时显示 ESP32 当前连接的 WiFi 名称。
-
-  2. **上位机局域网 TCP 遥测转发**
-     - 新增 `raspberry_pi/tcp_server.py`：上位机作为 TCP Server，将 ESP32 遥测 JSON 广播给局域网内其他系统。
-     - 通过 `--tcp-port 9000` 启动，默认禁用（不影响现有串口通信）。
-     - 其他系统只需 TCP 连接 `<上位机IP>:9000` 即可接收 JSON Lines 遥测流。
 
   3. **网络设置页重构**
      - 拆分为"ESP32 下位机 WiFi"和"SH800 上位机 WiFi"两个独立面板。
@@ -84,6 +87,8 @@
 - pH、温度、电压、TDS、ToF、BME280、吸光度、浓度、PWM、蠕动泵、滑台状态实时显示。
 - AS7341 强度、变化率和 MLX90640 平均温度显示。
 - 自动按 `paper_dataset/closed_loop/*.csv` 和 `paper_dataset/serial_jsonl/*.jsonl` 结构保存实验数据。
+- 支持通过 `--server-url` 将遥测数据 HTTP POST 到远程服务器（/api/devices/titrator/telemetry），每 5 秒上传一次。
+- 界面右上角有上传状态指示灯：绿色闪烁＝成功，红色＝失败。
 - PWM1 和蠕动泵百分比设置。
 - 丝杆滑台速度、加速度、移动距离、移动时间设置。
 - 丝杆滑台使能、关闭使能、停止、立即停止、清零、急停。
@@ -132,7 +137,8 @@
 │   ├── qt_app.py                    # SH800 主窗口逻辑
 │   ├── serial_worker.py             # SH800 /dev/tty* 串口检测
 │   ├── system_manager.py           # SH800 nmcli WiFi / Git 管理
-│   ├── tcp_server.py               # TCP 遥测转发服务器（局域网广播 JSON）
+│   ├── http_uploader.py            # HTTP 遥测上传（POST JSON 到远程服务器）
+│   ├── tcp_server.py               # TCP 遥测转发服务器（已废弃，改用 http_uploader.py）
 │   ├── ota_update.py                # 命令行 OTA 入口
 │   ├── ota_upload_bin.py            # 不依赖 PlatformIO 的 Python OTA 上传器
 │   └── README.md                    # SH800端说明
@@ -1338,10 +1344,10 @@ cd ~/diding
 python3.12 raspberry_pi/titrator_gui.py --project-dir ~/diding
 ```
 
-启动时开启 TCP 遥测转发（端口 9000）：
+启动时开启远程 HTTP 遥测上传：
 
 ```bash
-python3.12 raspberry_pi/titrator_gui.py --tcp-port 9000
+python3.12 raspberry_pi/titrator_gui.py --server-url http://47.xx.xx.xx
 ```
 
 手动指定串口：
@@ -1380,10 +1386,10 @@ cd diding
 python windows/titrator_gui.py
 ```
 
-启动时开启 TCP 遥测转发（端口 9000）：
+启动时开启远程 HTTP 遥测上传：
 
 ```powershell
-python windows/titrator_gui.py --tcp-port 9000
+python windows/titrator_gui.py --server-url http://47.xx.xx.xx
 ```
 
 手动指定串口：

@@ -13,7 +13,7 @@ from qt_pages.update_page import UpdatePage
 from qt_widgets import append_log, make_button
 from qt_workers import OtaTask, SystemTask, thread_pool
 from system_manager import DEFAULT_OTA_PASSWORD, LinuxSystemManager
-from tcp_server import TcpRelayServer
+from http_uploader import HttpTelemetryUploader
 from telemetry_logger import TelemetryLogger
 
 
@@ -33,7 +33,7 @@ class TitratorQtApp(QMainWindow):
         target_concentration_mg_l: float | None = 8.0,
         duration_s: int | None = None,
         sample_interval_s: int = 1,
-        tcp_port: int = 0,
+        server_url: str = "",
     ):
         super().__init__()
         self.worker = worker
@@ -44,10 +44,11 @@ class TitratorQtApp(QMainWindow):
         self.ota_start_time = 0.0
         self.ota_last_output_time = 0.0
         self.pending_telemetry = None
-        self._tcp_server: TcpRelayServer | None = None
-        if tcp_port > 0:
-            self._tcp_server = TcpRelayServer(port=tcp_port)
-            self._tcp_server.start()
+        self._http_uploader: HttpTelemetryUploader | None = None
+        self._last_upload_time = 0.0
+        if server_url:
+            self._http_uploader = HttpTelemetryUploader(server_url)
+            self._http_uploader.start()
         self.telemetry_logger = TelemetryLogger(
             project_dir,
             log_dir=log_dir,
@@ -82,6 +83,14 @@ class TitratorQtApp(QMainWindow):
         title.setObjectName("titleLabel")
         self.status_label = QLabel("已启动，等待 ESP32 遥测...")
         self.ip_label = QLabel("ESP32 IP: --")
+        self.upload_indicator = QLabel()
+        self.upload_indicator.setFixedSize(14, 14)
+        self.upload_indicator.setStyleSheet(
+            "background-color: #666; border-radius: 7px;"
+        )
+        self.upload_indicator.setToolTip("遥测上传状态")
+        self.upload_indicator.setVisible(False)
+        self._indicator_green = False
         self.status_label.setWordWrap(True)
         self.ip_label.setWordWrap(True)
         self.status_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
@@ -89,6 +98,7 @@ class TitratorQtApp(QMainWindow):
         top_layout.addWidget(title)
         top_layout.addStretch(1)
         top_layout.addWidget(self.ip_label, 0)
+        top_layout.addWidget(self.upload_indicator, 0)
         top_layout.addWidget(self.status_label, 1)
         top_layout.addWidget(make_button("急停", self.emergency_stop, danger=True))
         root.addWidget(top_bar)
@@ -114,9 +124,12 @@ class TitratorQtApp(QMainWindow):
         self.ota_heartbeat_timer.timeout.connect(self.update_ota_heartbeat)
 
         self.refresh_wifi_status()
-        if self._tcp_server:
+        self._upload_status_timer = QTimer(self)
+        self._upload_status_timer.timeout.connect(self._update_upload_status)
+        self._upload_status_timer.start(2000)
+        if self._http_uploader:
             self.status_label.setText(
-                f"{self.status_label.text()} | TCP :{self._tcp_server.port}"
+                f"{self.status_label.text()} | 服务器 {self._http_uploader.endpoint}"
             )
 
     def next_id(self):
@@ -395,15 +408,50 @@ class TitratorQtApp(QMainWindow):
         self.log_serial("RX " + json.dumps(msg, ensure_ascii=False))
         self.telemetry_logger.write(msg)
         self.update_telemetry(msg)
-        if self._tcp_server and self._tcp_server.client_count > 0:
-            self._tcp_server.broadcast(msg)
+        if self._http_uploader:
+            now = time.time()
+            if now - self._last_upload_time >= 5.0:
+                self._last_upload_time = now
+                self._http_uploader.enqueue(msg)
+
+    def _update_upload_status(self):
+        if not self._http_uploader:
+            return
+        # Show the indicator whenever uploader is active
+        self.upload_indicator.setVisible(True)
+        if self._http_uploader.last_success:
+            # Blink green briefly
+            if not self._indicator_green:
+                self._indicator_green = True
+                self.upload_indicator.setStyleSheet(
+                    "background-color: #00cc66; border-radius: 7px;"
+                )
+                # Turn back to gray after 600 ms
+                QTimer.singleShot(600, self._dim_indicator)
+        else:
+            # Steady red = last upload failed
+            self._indicator_green = False
+            self.upload_indicator.setStyleSheet(
+                "background-color: #cc3333; border-radius: 7px;"
+            )
+
+        self.status_label.setText(
+            f"已连接串口 {self.worker.resolved_port or '--'} | {self._http_uploader.status}"
+        )
+
+    def _dim_indicator(self):
+        self._indicator_green = False
+        if self._http_uploader and self._http_uploader.last_success:
+            self.upload_indicator.setStyleSheet(
+                "background-color: #666; border-radius: 7px;"
+            )
 
     def log_serial(self, text):
         append_log(self.control_page.log, text)
 
     def closeEvent(self, event):
-        if self._tcp_server:
-            self._tcp_server.stop()
+        if self._http_uploader:
+            self._http_uploader.stop()
         self.worker.stop()
         self.telemetry_logger.close()
         event.accept()

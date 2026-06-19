@@ -31,10 +31,9 @@ def main():
     parser.add_argument("--duration-s", type=int, default=None)
     parser.add_argument("--sample-interval-s", type=int, default=1)
     parser.add_argument(
-        "--tcp-port",
-        type=int,
-        default=0,
-        help="TCP relay port for LAN telemetry forwarding (0 = disabled)",
+        "--server-url",
+        default="",
+        help="Remote server URL (e.g. http://47.xx.xx.xx). Telemetry is POSTed to /api/devices/titrator/telemetry",
     )
     args = parser.parse_args()
 
@@ -75,7 +74,7 @@ def main():
         target_concentration_mg_l=args.target_concentration_mg_l,
         duration_s=args.duration_s,
         sample_interval_s=args.sample_interval_s,
-        tcp_port=args.tcp_port,
+        server_url=args.server_url,
     )
     if worker.resolved_port:
         window.status_label.setText(f"已连接串口 {worker.resolved_port}，等待 ESP32 遥测...")
